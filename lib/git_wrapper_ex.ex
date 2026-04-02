@@ -136,6 +136,25 @@ defmodule GitWrapperEx do
   end
 
   @doc """
+  Runs `git checkout` to switch branches, create and switch branches, or restore files.
+
+  ## Options
+
+    * `:config` - a `GitWrapper.Config` struct (default: `GitWrapper.Config.new()`)
+    * `:branch` - name of the branch to switch to
+    * `:create` - when `true`, creates the branch before switching (`-b` flag, default `false`)
+    * `:files` - list of file paths to restore from the index (default `[]`)
+
+  """
+  @spec checkout(keyword()) ::
+          {:ok, GitWrapper.Checkout.t()} | {:ok, :done} | {:error, term()}
+  def checkout(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(GitWrapper.Commands.Checkout, rest)
+    GitWrapper.Command.run(GitWrapper.Commands.Checkout, command, config)
+  end
+
+  @doc """
   Runs `git stash` to list, save, pop, or drop stash entries.
 
   ## Options
