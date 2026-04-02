@@ -155,6 +155,58 @@ defmodule GitWrapperEx do
   end
 
   @doc """
+  Runs `git add` to stage files for the next commit.
+
+  ## Options
+
+    * `:config` - a `GitWrapper.Config` struct (default: `GitWrapper.Config.new()`)
+    * `:files` - list of file paths to stage (default `[]`)
+    * `:all` - stage all changes including deletions (`--all` flag, default `false`)
+
+  """
+  @spec add(keyword()) :: {:ok, :done} | {:error, term()}
+  def add(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(GitWrapper.Commands.Add, rest)
+    GitWrapper.Command.run(GitWrapper.Commands.Add, command, config)
+  end
+
+  @doc """
+  Runs `git merge` to merge a branch or abort an in-progress merge.
+
+  Pass a branch name as the first argument to merge it into the current branch.
+  Pass `:abort` to abort an in-progress merge.
+
+  ## Options
+
+    * `:config` - a `GitWrapper.Config` struct (default: `GitWrapper.Config.new()`)
+    * `:no_ff` - when `true`, forces a merge commit even for fast-forward merges
+      (`--no-ff` flag, default `false`)
+
+  ## Examples
+
+      GitWrapperEx.merge("feature-branch")
+      GitWrapperEx.merge("feature-branch", no_ff: true)
+      GitWrapperEx.merge(:abort)
+
+  """
+  @spec merge(String.t() | :abort, keyword()) ::
+          {:ok, GitWrapper.MergeResult.t()} | {:ok, :done} | {:error, term()}
+  def merge(branch_or_abort, opts \\ [])
+
+  def merge(:abort, opts) do
+    {config, _rest} = Keyword.pop(opts, :config, Config.new())
+    command = %GitWrapper.Commands.Merge{abort: true}
+    GitWrapper.Command.run(GitWrapper.Commands.Merge, command, config)
+  end
+
+  def merge(branch, opts) when is_binary(branch) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(GitWrapper.Commands.Merge, [{:branch, branch} | rest])
+    GitWrapper.Command.run(GitWrapper.Commands.Merge, command, config)
+  end
+
+  @doc """
   Runs `git stash` to list, save, pop, or drop stash entries.
 
   ## Options
