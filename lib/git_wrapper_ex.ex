@@ -113,4 +113,47 @@ defmodule GitWrapperEx do
     command = struct!(GitWrapper.Commands.Remote, rest)
     GitWrapper.Command.run(GitWrapper.Commands.Remote, command, config)
   end
+
+  @doc """
+  Runs `git tag` to list, create, or delete tags.
+
+  ## Options
+
+    * `:config` - a `GitWrapper.Config` struct (default: `GitWrapper.Config.new()`)
+    * `:create` - name of a new tag to create
+    * `:message` - annotation message (creates an annotated tag when set with `:create`)
+    * `:delete` - name of a tag to delete
+    * `:ref` - commit ref to tag (default: HEAD)
+    * `:sort` - sort order for listing (e.g., `"-version:refname"`)
+
+  """
+  @spec tag(keyword()) ::
+          {:ok, [GitWrapper.Tag.t()]} | {:ok, :done} | {:error, term()}
+  def tag(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(GitWrapper.Commands.Tag, rest)
+    GitWrapper.Command.run(GitWrapper.Commands.Tag, command, config)
+  end
+
+  @doc """
+  Runs `git stash` to list, save, pop, or drop stash entries.
+
+  ## Options
+
+    * `:config` - a `GitWrapper.Config` struct (default: `GitWrapper.Config.new()`)
+    * `:save` - push current changes onto the stash (default `false`)
+    * `:pop` - pop the top stash entry (default `false`)
+    * `:drop` - drop a stash entry (default `false`)
+    * `:message` - message for the stash entry (used with `:save`)
+    * `:index` - stash index for `:pop` or `:drop` (e.g., `0` for `stash@{0}`)
+    * `:include_untracked` - include untracked files when saving (default `false`)
+
+  """
+  @spec stash(keyword()) ::
+          {:ok, [GitWrapper.StashEntry.t()]} | {:ok, :done} | {:error, term()}
+  def stash(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(GitWrapper.Commands.Stash, rest)
+    GitWrapper.Command.run(GitWrapper.Commands.Stash, command, config)
+  end
 end
