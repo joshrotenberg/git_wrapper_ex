@@ -207,6 +207,72 @@ defmodule GitWrapperEx do
   end
 
   @doc """
+  Runs `git init` to initialize a new repository.
+
+  ## Options
+
+    * `:config` - a `GitWrapper.Config` struct (default: `GitWrapper.Config.new()`)
+    * `:path` - directory to initialize (default: the working directory)
+    * `:bare` - when `true`, initializes a bare repository (`--bare` flag, default `false`)
+
+  """
+  @spec init(keyword()) :: {:ok, :done} | {:error, term()}
+  def init(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(GitWrapper.Commands.Init, rest)
+    GitWrapper.Command.run(GitWrapper.Commands.Init, command, config)
+  end
+
+  @doc """
+  Runs `git clone` to clone a repository.
+
+  The `:config` working directory determines where the clone is created.
+
+  ## Options
+
+    * `:config` - a `GitWrapper.Config` struct (default: `GitWrapper.Config.new()`)
+    * `:depth` - create a shallow clone with the given number of commits (`--depth` flag)
+    * `:branch` - check out the given branch after cloning (`--branch` flag)
+    * `:directory` - name of the target directory (default: inferred from the URL)
+
+  ## Examples
+
+      GitWrapperEx.clone("https://github.com/owner/repo.git")
+      GitWrapperEx.clone("https://github.com/owner/repo.git", depth: 1)
+      GitWrapperEx.clone("https://github.com/owner/repo.git", branch: "main", directory: "my-repo")
+
+  """
+  @spec clone(String.t(), keyword()) :: {:ok, :done} | {:error, term()}
+  def clone(url, opts \\ []) when is_binary(url) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(GitWrapper.Commands.Clone, [{:url, url} | rest])
+    GitWrapper.Command.run(GitWrapper.Commands.Clone, command, config)
+  end
+
+  @doc """
+  Runs `git reset` to move HEAD and optionally modify the index and working tree.
+
+  ## Options
+
+    * `:config` - a `GitWrapper.Config` struct (default: `GitWrapper.Config.new()`)
+    * `:ref` - the ref to reset to (default: `"HEAD"`)
+    * `:mode` - one of `:soft`, `:mixed` (default), or `:hard`
+
+  ## Examples
+
+      GitWrapperEx.reset()
+      GitWrapperEx.reset(mode: :soft, ref: "HEAD~1")
+      GitWrapperEx.reset(mode: :hard)
+
+  """
+  @spec reset(keyword()) :: {:ok, :done} | {:error, term()}
+  def reset(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(GitWrapper.Commands.Reset, rest)
+    GitWrapper.Command.run(GitWrapper.Commands.Reset, command, config)
+  end
+
+  @doc """
   Runs `git stash` to list, save, pop, or drop stash entries.
 
   ## Options
