@@ -1,57 +1,51 @@
 # Git
 
 [![CI](https://github.com/joshrotenberg/git_wrapper_ex/actions/workflows/ci.yml/badge.svg)](https://github.com/joshrotenberg/git_wrapper_ex/actions/workflows/ci.yml)
-[![Hex.pm](https://img.shields.io/hexpm/v/git_wrapper_ex.svg)](https://hex.pm/packages/git_wrapper_ex)
-[![Documentation](https://img.shields.io/badge/docs-hexdocs-blue.svg)](https://hexdocs.pm/git_wrapper_ex)
+[![Hex.pm](https://img.shields.io/hexpm/v/git.svg)](https://hex.pm/packages/git)
+[![Documentation](https://img.shields.io/badge/docs-hexdocs-blue.svg)](https://hexdocs.pm/git)
 
 A clean Elixir wrapper for the git CLI. Provides a direct, idiomatic mapping
-to git subcommands with fully parsed output structs. No NIFs, no ports — just
-`System.cmd/3` with structured results.
+to git subcommands with fully parsed output structs and higher-level workflow
+abstractions. No NIFs, no ports -- just `System.cmd/3` with structured results.
 
 ## Installation
 
-Add `git_wrapper_ex` to your dependencies in `mix.exs`:
+Add `git` to your dependencies in `mix.exs`:
 
 ```elixir
 def deps do
   [
-    {:git_wrapper_ex, "~> 0.1.0"}
+    {:git, "~> 0.1.0"}
   ]
 end
 ```
 
-Then fetch deps:
-
-```bash
-mix deps.get
-```
-
-## Quick Start
+## Quick start
 
 ```elixir
 # Check repository status
 {:ok, status} = Git.status()
-IO.inspect(status.branch)   # "main"
-IO.inspect(status.entries)  # [%{index: "M", working_tree: " ", path: "lib/foo.ex"}]
+status.branch   #=> "main"
+status.entries  #=> [%{index: "M", working_tree: " ", path: "lib/foo.ex"}]
 
-# Stage all changes and commit
+# Stage and commit
 {:ok, :done}  = Git.add(all: true)
 {:ok, result} = Git.commit("feat: add new feature")
-IO.inspect(result.hash)    # "abc1234"
-IO.inspect(result.subject) # "feat: add new feature"
+result.hash    #=> "abc1234"
 
-# Inspect the last 10 commits
-{:ok, commits} = Git.log(max_count: 10)
+# Branch, push, pull
+{:ok, _}     = Git.checkout(branch: "feat/new", create: true)
+{:ok, :done} = Git.push(remote: "origin", branch: "feat/new", set_upstream: true)
+{:ok, _}     = Git.pull(rebase: true, autostash: true)
+
+# Inspect history
+{:ok, commits} = Git.log(max_count: 5)
 Enum.each(commits, fn c -> IO.puts("#{c.abbreviated_hash}  #{c.subject}") end)
-
-# Create and switch to a branch
-{:ok, :done}    = Git.branch(create: "feat/my-feature")
-{:ok, checkout} = Git.checkout(branch: "feat/my-feature")
 ```
 
-### Using a custom config
+## Configuration
 
-Pass a `Git.Config` struct via the `:config` option to set the working
+Pass a `Git.Config` struct via the `:config` option to control the working
 directory, git binary path, environment variables, or timeout:
 
 ```elixir
@@ -63,187 +57,173 @@ config = Git.Config.new(
 {:ok, status} = Git.status(config: config)
 ```
 
-## API Reference
+## Commands
 
-All functions are in the `Git` module and follow the same convention:
+32 git commands with full option support and parsed output.
 
-- Accept an options keyword list; most also accept leading positional arguments.
-- Always return `{:ok, result}` on success or `{:error, {stdout, exit_code}}` on failure.
-- Accept `:config` as a `Git.Config` struct to override defaults.
-
-| Function | git command | Returns on success |
+| Function | git command | Returns |
 |---|---|---|
-| `status/1` | `git status --porcelain=v1 -b` | `{:ok, Git.Status.t()}` |
-| `log/1` | `git log` | `{:ok, [Git.Commit.t()]}` |
-| `commit/2` | `git commit` | `{:ok, Git.CommitResult.t()}` |
-| `add/1` | `git add` | `{:ok, :done}` |
-| `branch/1` | `git branch` | `{:ok, [Git.Branch.t()]}` or `{:ok, :done}` |
-| `checkout/1` | `git checkout` | `{:ok, Git.Checkout.t()}` or `{:ok, :done}` |
-| `diff/1` | `git diff` | `{:ok, Git.Diff.t()}` |
-| `merge/2` | `git merge` | `{:ok, Git.MergeResult.t()}` or `{:ok, :done}` |
-| `remote/1` | `git remote` | `{:ok, [Git.Remote.t()]}` or `{:ok, :done}` |
-| `tag/1` | `git tag` | `{:ok, [Git.Tag.t()]}` or `{:ok, :done}` |
-| `stash/1` | `git stash` | `{:ok, [Git.StashEntry.t()]}` or `{:ok, :done}` |
-| `init/1` | `git init` | `{:ok, :done}` |
-| `clone/2` | `git clone` | `{:ok, :done}` |
-| `reset/1` | `git reset` | `{:ok, :done}` |
+| `status/1` | `git status` | `Git.Status.t()` |
+| `log/1` | `git log` | `[Git.Commit.t()]` |
+| `commit/2` | `git commit` | `Git.CommitResult.t()` |
+| `add/1` | `git add` | `:done` |
+| `branch/1` | `git branch` | `[Git.Branch.t()]` or `:done` |
+| `checkout/1` | `git checkout` | `Git.Checkout.t()` or `:done` |
+| `diff/1` | `git diff` | `Git.Diff.t()` |
+| `merge/2` | `git merge` | `Git.MergeResult.t()` or `:done` |
+| `remote/1` | `git remote` | `[Git.Remote.t()]` or `:done` |
+| `tag/1` | `git tag` | `[Git.Tag.t()]` or `:done` |
+| `stash/1` | `git stash` | `[Git.StashEntry.t()]` or `:done` |
+| `init/1` | `git init` | `:done` |
+| `clone/2` | `git clone` | `:done` |
+| `reset/1` | `git reset` | `:done` |
+| `push/1` | `git push` | `:done` |
+| `pull/1` | `git pull` | `Git.PullResult.t()` |
+| `fetch/1` | `git fetch` | `:done` |
+| `rebase/1` | `git rebase` | `Git.RebaseResult.t()` or `:done` |
+| `cherry_pick/1` | `git cherry-pick` | `Git.CherryPickResult.t()` or `:done` |
+| `show/1` | `git show` | `Git.ShowResult.t()` |
+| `rev_parse/1` | `git rev-parse` | `String.t()` |
+| `clean/1` | `git clean` | `[String.t()]` |
+| `blame/2` | `git blame` | `[Git.BlameEntry.t()]` |
+| `mv/3` | `git mv` | `:done` |
+| `rm/1` | `git rm` | `:done` |
+| `revert/1` | `git revert` | `Git.RevertResult.t()` or `:done` |
+| `worktree/1` | `git worktree` | `[Git.Worktree.t()]` or `:done` |
+| `git_config/1` | `git config` | `String.t()` or `[{k, v}]` or `:done` |
+| `ls_files/1` | `git ls-files` | `[String.t()]` |
+| `reflog/1` | `git reflog` | `[Git.ReflogEntry.t()]` |
+| `bisect/1` | `git bisect` | `Git.BisectResult.t()` or `:done` |
+| `grep/2` | `git grep` | `[Git.GrepResult.t()]` |
 
-### `status/1`
+All functions return `{:ok, result}` on success or `{:error, {stdout, exit_code}}` on failure.
+
+## Higher-level modules
+
+### Git.Repo
+
+Stateful repository struct for cleaner API usage:
 
 ```elixir
-{:ok, status} = Git.status()
-# status.branch   => "main"
-# status.tracking => "origin/main"
-# status.ahead    => 2
-# status.behind   => 0
-# status.entries  => [%{index: "M", working_tree: " ", path: "lib/foo.ex"}]
+{:ok, repo} = Git.Repo.open("/path/to/repo")
+
+{:ok, status} = Git.Repo.status(repo)
+{:ok, :done}  = Git.Repo.add(repo, all: true)
+{:ok, result} = Git.Repo.commit(repo, "feat: new feature")
+{:ok, :done}  = Git.Repo.push(repo)
+
+# Pipeline helpers
+Git.Repo.ok(repo)
+|> Git.Repo.run(fn r ->
+  File.write!("new.txt", "content")
+  {:ok, :done} = Git.Repo.add(r, files: ["new.txt"])
+  {:ok, r}
+end)
+|> Git.Repo.run(fn r ->
+  {:ok, _} = Git.Repo.commit(r, "add file")
+  {:ok, r}
+end)
 ```
 
-### `log/1`
+### Git.Workflow
 
-Options: `:max_count`, `:author`, `:since`, `:until_date`, `:path`
+Composable multi-step workflows:
 
 ```elixir
-{:ok, commits} = Git.log(max_count: 5, author: "alice")
-# commits => [%Git.Commit{hash: "...", subject: "...", ...}]
+# Feature branch with automatic cleanup
+Git.Workflow.feature_branch("feat/login", fn opts ->
+  File.write!("login.ex", "...")
+  {:ok, :done} = Git.add(Keyword.merge(opts, files: ["login.ex"]))
+  {:ok, _} = Git.commit("feat: add login", opts)
+  {:ok, :done}
+end, merge: true, delete: true, config: config)
+
+# Stage everything and commit in one call
+Git.Workflow.commit_all("fix: patch bug", config: config)
+
+# Sync with upstream (fetch + rebase, with autostash)
+Git.Workflow.sync(config: config)
+
+# Squash merge a branch
+Git.Workflow.squash_merge("feature-branch", message: "feat: all the things", config: config)
 ```
 
-### `commit/2`
+### Git.History
 
-Options: `:all`, `:amend`, `:allow_empty`
+Query commit history:
 
 ```elixir
-{:ok, result} = Git.commit("fix: correct off-by-one", all: true)
-# result.branch        => "main"
-# result.hash          => "abc1234"
-# result.files_changed => 1
-# result.insertions    => 3
-# result.deletions     => 1
+{:ok, commits} = Git.History.commits_between("v1.0.0", "v2.0.0", config: config)
+{:ok, changelog} = Git.History.changelog("v1.0.0", "v2.0.0", config: config)
+# changelog.features, changelog.fixes, changelog.other
+
+{:ok, contributors} = Git.History.contributors(path: "lib/", config: config)
+{:ok, true} = Git.History.ancestor?("v1.0.0", "main", config: config)
 ```
 
-### `add/1`
+### Git.Changes
 
-Options: `:files` (list), `:all`
+Analyze repository changes:
 
 ```elixir
-{:ok, :done} = Git.add(files: ["lib/foo.ex", "test/foo_test.exs"])
-{:ok, :done} = Git.add(all: true)
+{:ok, changes} = Git.Changes.between("HEAD~5", "HEAD", config: config)
+# [%{status: :modified, path: "lib/foo.ex"}, %{status: :added, path: "lib/bar.ex"}]
+
+{:ok, uncommitted} = Git.Changes.uncommitted(config: config)
+# uncommitted.staged, uncommitted.modified, uncommitted.untracked
+
+{:ok, conflicts} = Git.Changes.conflicts(config: config)
 ```
 
-### `branch/1`
+### Git.Info
 
-Options: `:create`, `:delete`, `:force_delete`, `:all`
+Repository introspection:
 
 ```elixir
-{:ok, branches} = Git.branch()
-{:ok, branches} = Git.branch(all: true)
-{:ok, :done}    = Git.branch(create: "feat/new")
-{:ok, :done}    = Git.branch(delete: "old-branch")
-{:ok, :done}    = Git.branch(delete: "gone", force_delete: true)
+{:ok, summary} = Git.Info.summary(config: config)
+# summary.branch, summary.commit, summary.dirty, summary.ahead, summary.behind, ...
+
+{:ok, true} = Git.Info.dirty?(config: config)
+{:ok, head} = Git.Info.head(config: config)
+{:ok, root} = Git.Info.root(config: config)
 ```
 
-### `checkout/1`
+### Git.Search
 
-Options: `:branch`, `:create`, `:files`
+Search content and history:
 
 ```elixir
-{:ok, result} = Git.checkout(branch: "main")
-{:ok, result} = Git.checkout(branch: "feat/new", create: true)
-{:ok, :done}  = Git.checkout(files: ["lib/foo.ex"])
+{:ok, results} = Git.Search.grep("TODO", config: config)
+# [%Git.GrepResult{file: "lib/foo.ex", line_number: 42, content: "# TODO: refactor"}]
+
+{:ok, commits} = Git.Search.commits("fix:", config: config)
+{:ok, commits} = Git.Search.pickaxe("my_function", config: config)
+{:ok, files} = Git.Search.files("*.ex", config: config)
 ```
 
-### `diff/1`
+### Git.Branches
 
-Options: `:staged`, `:stat`, `:ref`, `:path`
+Branch management:
 
 ```elixir
-{:ok, diff} = Git.diff()
-{:ok, diff} = Git.diff(staged: true, stat: true)
-{:ok, diff} = Git.diff(ref: "HEAD~1", path: "lib/")
-# diff.total_insertions => 5
-# diff.total_deletions  => 2
-# diff.files            => [%Git.DiffFile{path: "lib/foo.ex", ...}]
+{:ok, "main"} = Git.Branches.current(config: config)
+{:ok, true} = Git.Branches.exists?("feat/login", config: config)
+{:ok, merged} = Git.Branches.merged(config: config)
+{:ok, deleted} = Git.Branches.cleanup_merged(exclude: ["main", "develop"], config: config)
+{:ok, %{ahead: 3, behind: 0}} = Git.Branches.divergence("feat/x", "main", config: config)
+{:ok, recent} = Git.Branches.recent(count: 5, config: config)
 ```
 
-### `merge/2`
+### Git.Hooks
 
-Options: `:no_ff`
-
-```elixir
-{:ok, result} = Git.merge("feature-branch")
-{:ok, result} = Git.merge("feature-branch", no_ff: true)
-{:ok, :done}  = Git.merge(:abort)
-# result.fast_forward       => true
-# result.already_up_to_date => false
-```
-
-### `remote/1`
-
-Options: `:add_name`, `:add_url`, `:remove`, `:verbose`
+Manage git hooks:
 
 ```elixir
-{:ok, remotes} = Git.remote()
-{:ok, :done}   = Git.remote(add_name: "upstream", add_url: "https://github.com/upstream/repo.git")
-{:ok, :done}   = Git.remote(remove: "upstream")
-# hd(remotes).name      => "origin"
-# hd(remotes).fetch_url => "https://github.com/owner/repo.git"
-```
-
-### `tag/1`
-
-Options: `:create`, `:message`, `:delete`, `:ref`, `:sort`
-
-```elixir
-{:ok, tags}  = Git.tag()
-{:ok, tags}  = Git.tag(sort: "-version:refname")
-{:ok, :done} = Git.tag(create: "v1.0.0")
-{:ok, :done} = Git.tag(create: "v1.0.0", message: "First release")
-{:ok, :done} = Git.tag(delete: "v0.9.0")
-```
-
-### `stash/1`
-
-Options: `:save`, `:pop`, `:drop`, `:message`, `:index`, `:include_untracked`
-
-```elixir
-{:ok, :done}   = Git.stash(save: true, message: "wip: my changes")
-{:ok, :done}   = Git.stash(save: true, include_untracked: true)
-{:ok, entries} = Git.stash()
-{:ok, :done}   = Git.stash(pop: true)
-{:ok, :done}   = Git.stash(drop: true, index: 1)
-```
-
-### `init/1`
-
-Options: `:path`, `:bare`
-
-```elixir
-{:ok, :done} = Git.init()
-{:ok, :done} = Git.init(path: "/tmp/new-repo")
-{:ok, :done} = Git.init(path: "/srv/repos/project.git", bare: true)
-```
-
-### `clone/2`
-
-Options: `:depth`, `:branch`, `:directory`
-
-```elixir
-{:ok, :done} = Git.clone("https://github.com/owner/repo.git")
-{:ok, :done} = Git.clone("https://github.com/owner/repo.git", depth: 1)
-{:ok, :done} = Git.clone("https://github.com/owner/repo.git",
-                 branch: "main",
-                 directory: "my-repo",
-                 config: Git.Config.new(working_dir: "/tmp"))
-```
-
-### `reset/1`
-
-Options: `:ref`, `:mode` (`:soft`, `:mixed`, `:hard`)
-
-```elixir
-{:ok, :done} = Git.reset()
-{:ok, :done} = Git.reset(mode: :soft, ref: "HEAD~1")
-{:ok, :done} = Git.reset(mode: :hard)
+{:ok, hooks} = Git.Hooks.list(config: config)
+{:ok, path} = Git.Hooks.write("pre-commit", "#!/bin/sh\nmix format --check-formatted", config: config)
+{:ok, true} = Git.Hooks.enabled?("pre-commit", config: config)
+{:ok, _} = Git.Hooks.disable("pre-commit", config: config)
+:ok = Git.Hooks.remove("pre-commit", config: config)
 ```
 
 ## License

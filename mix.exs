@@ -45,9 +45,13 @@ defmodule Git.MixProject do
       groups_for_modules: [
         "Higher-Level": [
           Git.Repo,
+          Git.Workflow,
           Git.History,
-          Git.Hooks,
-          Git.Branches
+          Git.Changes,
+          Git.Info,
+          Git.Search,
+          Git.Branches,
+          Git.Hooks
         ],
         "Data Structures": [
           Git.BisectResult,
@@ -59,6 +63,7 @@ defmodule Git.MixProject do
           Git.CommitResult,
           Git.Diff,
           Git.DiffFile,
+          Git.GrepResult,
           Git.MergeResult,
           Git.PullResult,
           Git.RebaseResult,
@@ -84,6 +89,7 @@ defmodule Git.MixProject do
           Git.Commands.Diff,
           Git.Commands.Fetch,
           Git.Commands.GitConfig,
+          Git.Commands.Grep,
           Git.Commands.Init,
           Git.Commands.Log,
           Git.Commands.LsFiles,
