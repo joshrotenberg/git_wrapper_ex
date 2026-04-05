@@ -506,4 +506,14 @@ defmodule Git.Repo do
   def bisect(%__MODULE__{} = repo, opts \\ []) do
     Git.bisect(Keyword.put(opts, :config, repo.config))
   end
+
+  @doc """
+  Runs `git grep` on the repository.
+
+  See `Git.grep/2` for available options.
+  """
+  @spec grep(t(), String.t(), keyword()) :: {:ok, [Git.GrepResult.t()]} | {:error, term()}
+  def grep(%__MODULE__{} = repo, pattern, opts \\ []) do
+    Git.grep(pattern, Keyword.put(opts, :config, repo.config))
+  end
 end

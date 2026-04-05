@@ -1,0 +1,14 @@
+{
+  "library": {
+    "name": "City Library",
+    "books": [
+      {"id": 1, "title": "The Great Gatsby", "author": "F. Scott Fitzgerald", "year": 1925, "genres": ["fiction", "classic"], "rating": 4.2, "available": true},
+      {"id": 2, "title": "To Kill a Mockingbird", "author": "Harper Lee", "year": 1960, "genres": ["fiction", "classic"], "rating": 4.5, "available": false},
+      {"id": 3, "title": "1984", "author": "George Orwell", "year": 1949, "genres": ["fiction", "dystopian"], "rating": 4.3, "available": true},
+      {"id": 4, "title": "Pride and Prejudice", "author": "Jane Austen", "year": 1813, "genres": ["fiction", "romance"], "rating": 4.4, "available": true},
+      {"id": 6, "title": "Brave New World", "author": "Aldous Huxley", "year": 1932, "genres": ["fiction", "dystopian"], "rating": 4.1, "available": true},
+      {"id": 7, "title": "The Hobbit", "author": "J.R.R. Tolkien", "year": 1937, "genres": ["fiction", "fantasy"], "rating": 4.6, "available": true},
+      {"id": 8, "title": "Animal Farm", "author": "George Orwell", "year": 1945, "genres": ["fiction", "satire"], "rating": 4.0, "available": false}
+    ]
+  }
+}

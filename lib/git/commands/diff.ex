@@ -14,11 +14,19 @@ defmodule Git.Commands.Diff do
           staged: boolean(),
           stat: boolean(),
           name_only: boolean(),
+          name_status: boolean(),
           ref: String.t() | nil,
+          ref_end: String.t() | nil,
           path: String.t() | nil
         }
 
-  defstruct staged: false, stat: false, name_only: false, ref: nil, path: nil
+  defstruct staged: false,
+            stat: false,
+            name_only: false,
+            name_status: false,
+            ref: nil,
+            ref_end: nil,
+            path: nil
 
   @doc """
   Returns the argument list for `git diff`.
@@ -27,7 +35,9 @@ defmodule Git.Commands.Diff do
   - `:staged` — adds `--cached` to show staged changes
   - `:stat` — adds `--stat` for file-level summary instead of full patch
   - `:name_only` — adds `--name-only` for listing just file paths
+  - `:name_status` — adds `--name-status` for file paths with status letters
   - `:ref` — adds a ref to compare against (e.g., `"HEAD~1"`)
+  - `:ref_end` — when set with `:ref`, compares `ref ref_end` (two-ref diff)
   - `:path` — adds `-- <path>` to limit the diff
 
   ## Examples
@@ -51,7 +61,9 @@ defmodule Git.Commands.Diff do
     |> maybe_add(command.staged, "--cached")
     |> maybe_add(command.stat, "--stat")
     |> maybe_add(command.name_only, "--name-only")
+    |> maybe_add(command.name_status, "--name-status")
     |> maybe_add_ref(command.ref)
+    |> maybe_add_ref(command.ref_end)
     |> maybe_add_path(command.path)
   end
 
