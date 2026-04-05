@@ -68,7 +68,9 @@ defmodule Git.WorkflowTest do
             {:ok, :done} = Git.add(Keyword.merge(opts, files: ["feature.txt"]))
             {:ok, _} = Git.commit("feat: add feature file", Keyword.take(opts, [:config]))
             {:ok, :worked}
-          end, config: cfg)
+          end,
+          config: cfg
+        )
 
       assert result == :worked
 
@@ -89,7 +91,10 @@ defmodule Git.WorkflowTest do
             {:ok, :done} = Git.add(Keyword.merge(opts, files: ["merged.txt"]))
             {:ok, _} = Git.commit("feat: add merged file", Keyword.take(opts, [:config]))
             {:ok, :done_work}
-          end, merge: true, config: cfg)
+          end,
+          merge: true,
+          config: cfg
+        )
 
       # Result should be the merge result (not the fun's return)
       assert %Git.MergeResult{} = merge_result
@@ -112,7 +117,11 @@ defmodule Git.WorkflowTest do
             {:ok, :done} = Git.add(Keyword.merge(opts, files: ["deleted.txt"]))
             {:ok, _} = Git.commit("feat: add file", Keyword.take(opts, [:config]))
             {:ok, :done_work}
-          end, merge: true, delete: true, config: cfg)
+          end,
+          merge: true,
+          delete: true,
+          config: cfg
+        )
 
       # Feature branch should be gone
       {:ok, false} = Git.Branches.exists?("feat/delete-test", config: cfg)
@@ -130,7 +139,9 @@ defmodule Git.WorkflowTest do
           "feat/error-test",
           fn _opts ->
             {:error, :something_went_wrong}
-          end, config: cfg)
+          end,
+          config: cfg
+        )
 
       # Should still be back on original branch
       {:ok, current} = Git.Branches.current(config: cfg)
