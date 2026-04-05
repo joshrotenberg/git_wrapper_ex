@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.0](https://github.com/joshrotenberg/git_wrapper_ex/compare/v0.2.0...v0.3.0) (2026-04-05)
+
+
+### Features
+
+* add describe, shortlog, format-patch, archive, ls-remote, ls-tree, submodule ([#55](https://github.com/joshrotenberg/git_wrapper_ex/issues/55)) ([e26c17f](https://github.com/joshrotenberg/git_wrapper_ex/commit/e26c17f3d9bcd3c20fefbffc815590c7bbc993bf))
+* add rev-list, merge-base, cherry, cat-file, check-ignore, notes, range-diff, sparse-checkout ([#58](https://github.com/joshrotenberg/git_wrapper_ex/issues/58)) ([e642c36](https://github.com/joshrotenberg/git_wrapper_ex/commit/e642c3673828d6a8e2eb7f562a439f49d9067bea))
+* add tier-3 commands, refactor raw System.cmd usage ([#59](https://github.com/joshrotenberg/git_wrapper_ex/issues/59)) ([4de2f5b](https://github.com/joshrotenberg/git_wrapper_ex/commit/4de2f5b992120be1d160ca31620dc9f65e538cda))
+
 ## [0.2.0](https://github.com/joshrotenberg/git_wrapper_ex/compare/v0.1.0...v0.2.0) (2026-04-05)
 
 
