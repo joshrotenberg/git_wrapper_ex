@@ -179,7 +179,10 @@ defmodule Git do
     * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
     * `:staged` - show staged (cached) diff (default `false`)
     * `:stat` - return file-level stats instead of full patch (default `false`)
+    * `:name_only` - list only file paths (default `false`)
+    * `:name_status` - list file paths with status letters (default `false`)
     * `:ref` - compare against this ref (e.g., `"HEAD~1"`)
+    * `:ref_end` - second ref for two-ref comparisons (requires `:ref`)
     * `:path` - limit the diff to this path
 
   """
@@ -930,5 +933,53 @@ defmodule Git do
     {config, rest} = Keyword.pop(opts, :config, Config.new())
     command = struct!(Git.Commands.Bisect, rest)
     Git.Command.run(Git.Commands.Bisect, command, config)
+  end
+
+  @doc """
+  Runs `git grep` to search tracked files for a pattern.
+
+  The search pattern is required as the first argument.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:paths` - list of paths to restrict search to
+    * `:line_number` - show line numbers (`-n`, default `true`)
+    * `:count` - show count per file (`-c`)
+    * `:files_with_matches` - show only filenames with matches (`-l`)
+    * `:files_without_match` - show only filenames without matches (`-L`)
+    * `:ignore_case` - case insensitive search (`-i`)
+    * `:word_regexp` - match whole words only (`-w`)
+    * `:extended_regexp` - use extended regex (`-E`)
+    * `:fixed_strings` - treat pattern as fixed string (`-F`)
+    * `:perl_regexp` - use Perl-compatible regex (`-P`)
+    * `:invert_match` - show non-matching lines (`--invert-match`)
+    * `:max_count` - max matches per file (`-m`)
+    * `:context` - show context lines (`-C`)
+    * `:before_context` - show lines before match (`-B`)
+    * `:after_context` - show lines after match (`-A`)
+    * `:show_function` - show surrounding function (`-p`)
+    * `:heading` - show filename as heading (`--heading`)
+    * `:break` - add blank line between file results (`--break`)
+    * `:untracked` - also search untracked files (`--untracked`)
+    * `:no_index` - search files not managed by git (`--no-index`)
+    * `:recurse_submodules` - search in submodules (`--recurse-submodules`)
+    * `:quiet` - suppress output, exit with status (`-q`)
+    * `:all_match` - require all patterns to match (`--all-match`)
+    * `:ref` - search in a specific ref (e.g. `"HEAD"`, `"v1.0"`)
+
+  ## Examples
+
+      Git.grep("defmodule")
+      Git.grep("TODO", ignore_case: true)
+      Git.grep("hello", files_with_matches: true)
+      Git.grep("pattern", ref: "HEAD~5", paths: ["lib/"])
+
+  """
+  @spec grep(String.t(), keyword()) :: {:ok, [Git.GrepResult.t()]} | {:error, term()}
+  def grep(pattern, opts \\ []) when is_binary(pattern) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.Grep, [{:pattern, pattern} | rest])
+    Git.Command.run(Git.Commands.Grep, command, config)
   end
 end

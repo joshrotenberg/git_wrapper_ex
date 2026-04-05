@@ -13,11 +13,13 @@ defmodule Git.Commands.Merge do
   @type t :: %__MODULE__{
           branch: String.t() | nil,
           no_ff: boolean(),
+          squash: boolean(),
           abort: boolean()
         }
 
   defstruct branch: nil,
             no_ff: false,
+            squash: false,
             abort: false
 
   # Process dictionary key used to communicate the operation mode from args/1
@@ -42,6 +44,9 @@ defmodule Git.Commands.Merge do
       iex> Git.Commands.Merge.args(%Git.Commands.Merge{abort: true})
       ["merge", "--abort"]
 
+      iex> Git.Commands.Merge.args(%Git.Commands.Merge{branch: "feature", squash: true})
+      ["merge", "--squash", "feature"]
+
   """
   @spec args(t()) :: [String.t()]
   @impl true
@@ -55,6 +60,7 @@ defmodule Git.Commands.Merge do
 
     ["merge"]
     |> maybe_add(command.no_ff, "--no-ff")
+    |> maybe_add(command.squash, "--squash")
     |> Kernel.++([branch])
   end
 

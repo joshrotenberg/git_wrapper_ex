@@ -20,7 +20,11 @@ defmodule Git.Commands.Log do
           since: String.t() | nil,
           until_date: String.t() | nil,
           path: String.t() | nil,
-          range: String.t() | nil
+          range: String.t() | nil,
+          grep: String.t() | nil,
+          all_match: boolean(),
+          pickaxe: String.t() | nil,
+          pickaxe_regex: String.t() | nil
         }
 
   defstruct [
@@ -29,7 +33,11 @@ defmodule Git.Commands.Log do
     :since,
     :until_date,
     :path,
-    :range
+    :range,
+    :grep,
+    :pickaxe,
+    :pickaxe_regex,
+    all_match: false
   ]
 
   @doc """
@@ -51,6 +59,9 @@ defmodule Git.Commands.Log do
     |> maybe_add("--author=", command.author)
     |> maybe_add("--since=", command.since)
     |> maybe_add("--until=", command.until_date)
+    |> maybe_add("--grep=", command.grep)
+    |> maybe_add_flag(command.all_match, "--all-match")
+    |> maybe_add_pickaxe(command.pickaxe, command.pickaxe_regex)
     |> maybe_add_range(command.range)
     |> maybe_add_path(command.path)
   end
@@ -126,6 +137,15 @@ defmodule Git.Commands.Log do
 
   defp maybe_add(args, _flag, nil), do: args
   defp maybe_add(args, flag, value), do: args ++ ["#{flag}#{value}"]
+
+  defp maybe_add_flag(args, true, flag), do: args ++ [flag]
+  defp maybe_add_flag(args, false, _flag), do: args
+
+  defp maybe_add_pickaxe(args, nil, nil), do: args
+  defp maybe_add_pickaxe(args, _pickaxe, regex) when is_binary(regex), do: args ++ ["-G#{regex}"]
+
+  defp maybe_add_pickaxe(args, pickaxe, _regex) when is_binary(pickaxe),
+    do: args ++ ["-S#{pickaxe}"]
 
   defp maybe_add_range(args, nil), do: args
   defp maybe_add_range(args, range), do: args ++ [range]
