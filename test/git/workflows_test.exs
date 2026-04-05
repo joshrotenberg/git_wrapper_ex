@@ -12,10 +12,15 @@ defmodule Git.WorkflowsTest do
       )
 
     File.mkdir_p!(tmp_dir)
-    System.cmd("git", ["init", "--initial-branch=main"], cd: tmp_dir)
-    System.cmd("git", ["config", "user.name", "Test User"], cd: tmp_dir)
-    System.cmd("git", ["config", "user.email", "test@test.com"], cd: tmp_dir)
-    System.cmd("git", ["commit", "--allow-empty", "-m", "initial"], cd: tmp_dir)
+    {:ok, :done} = Git.init(config: Config.new(working_dir: tmp_dir))
+
+    {:ok, :done} =
+      Git.git_config(set_key: "user.name", set_value: "Test User", config: config(tmp_dir))
+
+    {:ok, :done} =
+      Git.git_config(set_key: "user.email", set_value: "test@test.com", config: config(tmp_dir))
+
+    {:ok, _} = Git.commit("initial", allow_empty: true, config: config(tmp_dir))
     tmp_dir
   end
 
@@ -28,20 +33,22 @@ defmodule Git.WorkflowsTest do
 
     File.mkdir_p!(tmp_dir)
 
+    # Bare remote - still needs raw cmd since Git.init doesn't support --bare + path together
     remote_dir = Path.join(tmp_dir, "remote.git")
     File.mkdir_p!(remote_dir)
     System.cmd("git", ["init", "--bare", "--initial-branch=main"], cd: remote_dir)
 
     local_dir = Path.join(tmp_dir, "local")
     File.mkdir_p!(local_dir)
-    System.cmd("git", ["init", "--initial-branch=main"], cd: local_dir)
-    System.cmd("git", ["config", "user.name", "Test User"], cd: local_dir)
-    System.cmd("git", ["config", "user.email", "test@test.com"], cd: local_dir)
-    System.cmd("git", ["remote", "add", "origin", remote_dir], cd: local_dir)
+    cfg = config(local_dir)
+    {:ok, :done} = Git.init(config: cfg)
+    {:ok, :done} = Git.git_config(set_key: "user.name", set_value: "Test User", config: cfg)
+    {:ok, :done} = Git.git_config(set_key: "user.email", set_value: "test@test.com", config: cfg)
+    {:ok, :done} = Git.remote(add_name: "origin", add_url: remote_dir, config: cfg)
     File.write!(Path.join(local_dir, "README.md"), "# Test\n")
-    System.cmd("git", ["add", "."], cd: local_dir)
-    System.cmd("git", ["commit", "-m", "initial"], cd: local_dir)
-    System.cmd("git", ["push", "-u", "origin", "main"], cd: local_dir)
+    {:ok, :done} = Git.add(files: ["README.md"], config: cfg)
+    {:ok, _} = Git.commit("initial", config: cfg)
+    {:ok, :done} = Git.push(remote: "origin", branch: "main", set_upstream: true, config: cfg)
 
     {tmp_dir, local_dir, remote_dir}
   end
@@ -163,16 +170,17 @@ defmodule Git.WorkflowsTest do
 
       # Clone to a second local dir
       second_dir = Path.join(tmp_dir, "second")
+      {:ok, second_repo} = Repo.clone(remote_dir, second_dir, branch: "main")
+      {:ok, :done} = Repo.git_config(second_repo, set_key: "user.name", set_value: "Test User")
 
-      System.cmd("git", ["clone", "--branch", "main", remote_dir, second_dir])
-      System.cmd("git", ["config", "user.name", "Test User"], cd: second_dir)
-      System.cmd("git", ["config", "user.email", "test@test.com"], cd: second_dir)
+      {:ok, :done} =
+        Repo.git_config(second_repo, set_key: "user.email", set_value: "test@test.com")
 
       # In second dir: create file, commit, push
       File.write!(Path.join(second_dir, "from_second.txt"), "second content\n")
-      System.cmd("git", ["add", "."], cd: second_dir)
-      System.cmd("git", ["commit", "-m", "feat: from second"], cd: second_dir)
-      System.cmd("git", ["push"], cd: second_dir)
+      {:ok, :done} = Repo.add(second_repo, files: ["from_second.txt"])
+      {:ok, _} = Repo.commit(second_repo, "feat: from second")
+      {:ok, :done} = Repo.push(second_repo)
 
       # In first dir: fetch
       cfg = config(local_dir)
