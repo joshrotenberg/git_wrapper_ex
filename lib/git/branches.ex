@@ -153,19 +153,19 @@ defmodule Git.Branches do
   @spec divergence(String.t(), String.t(), keyword()) ::
           {:ok, %{ahead: non_neg_integer(), behind: non_neg_integer()}} | {:error, term()}
   def divergence(branch1, branch2, opts \\ []) do
-    {stdout, exit_code} =
-      run_raw(["rev-list", "--count", "--left-right", "#{branch1}...#{branch2}"], opts)
+    config = Keyword.get(opts, :config, Config.new())
 
-    if exit_code == 0 do
-      case stdout |> String.trim() |> String.split("\t") do
-        [ahead_str, behind_str] ->
-          {:ok, %{ahead: String.to_integer(ahead_str), behind: String.to_integer(behind_str)}}
+    case Git.rev_list(
+           ref: "#{branch1}...#{branch2}",
+           count: true,
+           left_right: true,
+           config: config
+         ) do
+      {:ok, %{left: ahead, right: behind}} ->
+        {:ok, %{ahead: ahead, behind: behind}}
 
-        _ ->
-          {:error, {:parse_error, stdout}}
-      end
-    else
-      {:error, {stdout, exit_code}}
+      {:error, _} = error ->
+        error
     end
   end
 
@@ -183,8 +183,11 @@ defmodule Git.Branches do
   @spec recent(keyword()) ::
           {:ok, [%{name: String.t(), date: String.t(), author: String.t(), subject: String.t()}]}
           | {:error, term()}
+  # TODO: Promote `git for-each-ref` to a proper Git.Commands.ForEachRef module
+  # so this function can use the command-based pipeline instead of raw System.cmd.
   def recent(opts \\ []) do
     {count, opts} = Keyword.pop(opts, :count, 10)
+    config = Keyword.get(opts, :config, Config.new())
 
     format = "%(refname:short)\t%(committerdate:relative)\t%(authorname)\t%(subject)"
 
@@ -196,7 +199,8 @@ defmodule Git.Branches do
       "--count=#{count}"
     ]
 
-    {stdout, exit_code} = run_raw(args, opts)
+    cmd_opts = Config.cmd_opts(config)
+    {stdout, exit_code} = System.cmd(config.binary, args, cmd_opts)
 
     if exit_code == 0 do
       {:ok, parse_recent_entries(stdout)}
@@ -253,11 +257,5 @@ defmodule Git.Branches do
           %{name: line, date: "", author: "", subject: ""}
       end
     end)
-  end
-
-  defp run_raw(args, opts) do
-    config = Keyword.get(opts, :config, Config.new())
-    cmd_opts = Config.cmd_opts(config)
-    System.cmd(config.binary, args, cmd_opts)
   end
 end

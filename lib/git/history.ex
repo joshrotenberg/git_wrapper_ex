@@ -170,14 +170,7 @@ defmodule Git.History do
           {:ok, boolean()} | {:error, term()}
   def ancestor?(ref1, ref2, opts \\ []) do
     {config, _rest} = extract_config(opts)
-    args = ["merge-base", "--is-ancestor", ref1, ref2]
-    cmd_opts = Config.cmd_opts(config)
-
-    case System.cmd(config.binary, args, cmd_opts) do
-      {_stdout, 0} -> {:ok, true}
-      {_stdout, 1} -> {:ok, false}
-      {stdout, exit_code} -> {:error, {stdout, exit_code}}
-    end
+    Git.merge_base(commits: [ref1, ref2], is_ancestor: true, config: config)
   end
 
   @doc """

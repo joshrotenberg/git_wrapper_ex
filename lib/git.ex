@@ -1497,4 +1497,210 @@ defmodule Git do
     command = struct!(Git.Commands.Notes, rest)
     Git.Command.run(Git.Commands.Notes, command, config)
   end
+
+  @doc """
+  Runs `git verify-commit` to check the GPG signature of a commit.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:verbose` - print the contents of the commit object before verifying (`-v`)
+    * `:raw` - print the raw gpg status output (`--raw`)
+
+  ## Examples
+
+      Git.verify_commit("HEAD")
+      Git.verify_commit("abc123", verbose: true)
+
+  """
+  @spec verify_commit(String.t(), keyword()) ::
+          {:ok, map()} | {:error, term()}
+  def verify_commit(commit, opts \\ []) when is_binary(commit) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.VerifyCommit, [{:commit, commit} | rest])
+    Git.Command.run(Git.Commands.VerifyCommit, command, config)
+  end
+
+  @doc """
+  Runs `git verify-tag` to check the GPG signature of a tag.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:verbose` - print the contents of the tag object before verifying (`-v`)
+    * `:raw` - print the raw gpg status output (`--raw`)
+    * `:format` - format string for output (`--format=`)
+
+  ## Examples
+
+      Git.verify_tag("v1.0")
+      Git.verify_tag("v1.0", verbose: true)
+
+  """
+  @spec verify_tag(String.t(), keyword()) ::
+          {:ok, map()} | {:error, term()}
+  def verify_tag(tag, opts \\ []) when is_binary(tag) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.VerifyTag, [{:tag, tag} | rest])
+    Git.Command.run(Git.Commands.VerifyTag, command, config)
+  end
+
+  @doc """
+  Runs `git gc` to clean up unnecessary files and optimize the repository.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:aggressive` - more aggressive optimization (`--aggressive`)
+    * `:auto` - only run if housekeeping is needed (`--auto`)
+    * `:prune` - prune loose objects older than date (`--prune=<date>`)
+    * `:no_prune` - do not prune any loose objects (`--no-prune`)
+    * `:quiet` - suppress progress output (`--quiet`)
+    * `:force` - force gc even if another gc may be running (`--force`)
+    * `:keep_largest_pack` - keep the largest pack (`--keep-largest-pack`)
+
+  ## Examples
+
+      Git.gc()
+      Git.gc(aggressive: true)
+      Git.gc(auto: true)
+      Git.gc(prune: "now")
+
+  """
+  @spec gc(keyword()) :: {:ok, :done} | {:error, term()}
+  def gc(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.Gc, rest)
+    Git.Command.run(Git.Commands.Gc, command, config)
+  end
+
+  @doc """
+  Runs `git rerere` to reuse recorded resolution of conflicted merges.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:status` - show files with recorded resolution (default when no subcommand)
+    * `:diff` - show diff of current resolution against recorded resolution
+    * `:clear` - clear all recorded resolutions
+    * `:forget` - forget resolution for a specific path (string)
+    * `:gc` - prune old recorded resolutions
+    * `:remaining` - show files that still need resolution
+
+  ## Examples
+
+      Git.rerere()
+      Git.rerere(status: true)
+      Git.rerere(diff: true)
+      Git.rerere(clear: true)
+      Git.rerere(forget: "path/to/file")
+      Git.rerere(gc: true)
+      Git.rerere(remaining: true)
+
+  """
+  @spec rerere(keyword()) ::
+          {:ok, [String.t()]} | {:ok, String.t()} | {:ok, :done} | {:error, term()}
+  def rerere(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.Rerere, rest)
+    Git.Command.run(Git.Commands.Rerere, command, config)
+  end
+
+  @doc """
+  Runs `git fsck` to verify connectivity and validity of objects.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:full` - check objects in all packs and alternate objects (`--full`)
+    * `:strict` - enable stricter checking (`--strict`)
+    * `:unreachable` - report unreachable objects (`--unreachable`)
+    * `:dangling` - report dangling objects (`--dangling`)
+    * `:no_dangling` - suppress dangling object warnings (`--no-dangling`)
+    * `:no_reflogs` - do not consider reflog entries (`--no-reflogs`)
+    * `:connectivity_only` - only check connectivity (`--connectivity-only`)
+    * `:root` - report root nodes (`--root`)
+    * `:lost_found` - write dangling objects into `.git/lost-found` (`--lost-found`)
+    * `:name_objects` - name objects for easier identification (`--name-objects`)
+    * `:verbose` - be verbose (`--verbose`)
+    * `:progress` - show progress (`--progress`)
+    * `:no_progress` - suppress progress (`--no-progress`)
+
+  ## Examples
+
+      Git.fsck()
+      Git.fsck(full: true, strict: true)
+      Git.fsck(unreachable: true, no_reflogs: true)
+
+  """
+  @spec fsck(keyword()) :: {:ok, [map()]} | {:error, term()}
+  def fsck(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.Fsck, rest)
+    Git.Command.run(Git.Commands.Fsck, command, config)
+  end
+
+  @doc """
+  Runs `git bundle` to create, verify, list heads of, or unbundle bundles.
+
+  Exactly one of `:create`, `:verify`, `:list_heads`, or `:unbundle` must be
+  set to the bundle file path.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:create` - output file path for creating a bundle
+    * `:verify` - bundle file path to verify
+    * `:list_heads` - bundle file path to list heads from
+    * `:unbundle` - bundle file path to unbundle
+    * `:rev` - revision range for create (e.g. `"HEAD"`, `"v1.0..v2.0"`)
+    * `:all` - include all refs (`--all`, for create)
+    * `:quiet` - suppress output (`-q`)
+    * `:progress` - show progress (`--progress`)
+
+  ## Examples
+
+      Git.bundle(create: "/tmp/repo.bundle", rev: "HEAD")
+      Git.bundle(verify: "/tmp/repo.bundle")
+      Git.bundle(list_heads: "/tmp/repo.bundle")
+
+  """
+  @spec bundle(keyword()) :: {:ok, term()} | {:error, term()}
+  def bundle(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.Bundle, rest)
+    Git.Command.run(Git.Commands.Bundle, command, config)
+  end
+
+  @doc """
+  Runs `git show-ref` to list references in the local repository.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:heads` - only show heads (`--heads`)
+    * `:tags` - only show tags (`--tags`)
+    * `:verify` - verify a specific ref exists (`--verify`)
+    * `:hash` - show only the SHA (`--hash`), or an integer for abbreviated hash
+    * `:abbrev` - abbreviate object names to N digits (`--abbrev=N`)
+    * `:dereference` - dereference tags (`-d`)
+    * `:quiet` - suppress output, useful with `:verify` (`-q`)
+    * `:exclude_existing` - filter out existing refs (`--exclude-existing`)
+    * `:patterns` - list of ref patterns to match
+
+  ## Examples
+
+      Git.show_ref()
+      Git.show_ref(heads: true)
+      Git.show_ref(tags: true)
+      Git.show_ref(verify: true, patterns: ["refs/heads/main"])
+      Git.show_ref(verify: true, quiet: true, patterns: ["refs/heads/main"])
+
+  """
+  @spec show_ref(keyword()) :: {:ok, term()} | {:error, term()}
+  def show_ref(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.ShowRef, rest)
+    Git.Command.run(Git.Commands.ShowRef, command, config)
+  end
 end
