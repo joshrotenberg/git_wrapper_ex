@@ -466,6 +466,17 @@ defmodule Git.Repo do
   end
 
   @doc """
+  Runs `git submodule` on the repository.
+
+  See `Git.submodule/1` for available options.
+  """
+  @spec submodule(t(), keyword()) ::
+          {:ok, [Git.SubmoduleEntry.t()]} | {:ok, :done} | {:ok, String.t()} | {:error, term()}
+  def submodule(%__MODULE__{} = repo, opts \\ []) do
+    Git.submodule(Keyword.put(opts, :config, repo.config))
+  end
+
+  @doc """
   Runs `git config` on the repository.
 
   See `Git.git_config/1` for available options.
@@ -515,5 +526,67 @@ defmodule Git.Repo do
   @spec grep(t(), String.t(), keyword()) :: {:ok, [Git.GrepResult.t()]} | {:error, term()}
   def grep(%__MODULE__{} = repo, pattern, opts \\ []) do
     Git.grep(pattern, Keyword.put(opts, :config, repo.config))
+  end
+
+  @doc """
+  Runs `git describe` on the repository.
+
+  See `Git.describe/1` for available options.
+  """
+  @spec describe(t(), keyword()) :: {:ok, String.t()} | {:error, term()}
+  def describe(%__MODULE__{} = repo, opts \\ []) do
+    Git.describe(Keyword.put(opts, :config, repo.config))
+  end
+
+  @doc """
+  Runs `git shortlog` on the repository.
+
+  See `Git.shortlog/1` for available options.
+  """
+  @spec shortlog(t(), keyword()) :: {:ok, [Git.ShortlogEntry.t()]} | {:error, term()}
+  def shortlog(%__MODULE__{} = repo, opts \\ []) do
+    Git.shortlog(Keyword.put(opts, :config, repo.config))
+  end
+
+  @doc """
+  Runs `git format-patch` on the repository.
+
+  See `Git.format_patch/1` for available options.
+  """
+  @spec format_patch(t(), keyword()) ::
+          {:ok, [String.t()]} | {:ok, String.t()} | {:error, term()}
+  def format_patch(%__MODULE__{} = repo, opts \\ []) do
+    Git.format_patch(Keyword.put(opts, :config, repo.config))
+  end
+
+  @doc """
+  Runs `git archive` on the repository.
+
+  See `Git.archive/1` for available options.
+  """
+  @spec archive(t(), keyword()) :: {:ok, :done} | {:error, term()}
+  def archive(%__MODULE__{} = repo, opts \\ []) do
+    Git.archive(Keyword.put(opts, :config, repo.config))
+  end
+
+  @doc """
+  Runs `git ls-remote` on the repository.
+
+  See `Git.ls_remote/1` for available options.
+  """
+  @spec ls_remote(t(), keyword()) :: {:ok, [Git.LsRemoteEntry.t()]} | {:error, term()}
+  def ls_remote(%__MODULE__{} = repo, opts \\ []) do
+    Git.ls_remote(Keyword.put(opts, :config, repo.config))
+  end
+
+  @doc """
+  Runs `git ls-tree` on the repository.
+
+  See `Git.ls_tree/1` for available options.
+  """
+  @spec ls_tree(t(), keyword()) ::
+          {:ok, [Git.TreeEntry.t()] | [String.t()]} | {:error, term()}
+  def ls_tree(%__MODULE__{} = repo, opts \\ []) do
+    Git.ls_tree(Keyword.put(opts, :config, repo.config))
   end
 end

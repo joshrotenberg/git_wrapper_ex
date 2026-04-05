@@ -811,6 +811,55 @@ defmodule Git do
   end
 
   @doc """
+  Runs `git submodule` to manage submodules.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:status` - show submodule status (default `true`)
+    * `:init` - initialize submodules
+    * `:update` - update submodules
+    * `:add_url` - URL to add as submodule
+    * `:add_path` - path for new submodule
+    * `:deinit` - path to deinit
+    * `:sync` - sync URLs
+    * `:summary` - show summary of changes
+    * `:set_branch` - set branch for submodule (requires `:path`)
+    * `:set_url` - set URL for submodule (requires `:path`)
+    * `:path` - submodule path for set-branch/set-url/init/update
+    * `:recursive` - apply recursively (`--recursive`)
+    * `:force` - force operation (`--force`)
+    * `:remote` - use remote tracking branch (`--remote`)
+    * `:merge` - merge into working tree (`--merge`)
+    * `:rebase` - rebase onto new commits (`--rebase`)
+    * `:depth` - shallow clone depth (`--depth`)
+    * `:reference` - reference repository (`--reference`)
+    * `:name` - logical name for add (`--name`)
+    * `:branch` - branch for add (`-b`)
+    * `:quiet` - suppress output (`-q`)
+    * `:all` - all submodules for deinit (`--all`)
+
+  The `foreach` subcommand is not supported because it requires an arbitrary
+  shell command, which does not fit the structured command model.
+
+  ## Examples
+
+      Git.submodule()
+      Git.submodule(add_url: "https://example.com/lib.git", add_path: "vendor/lib")
+      Git.submodule(init: true)
+      Git.submodule(update: true, recursive: true)
+      Git.submodule(deinit: "vendor/lib", force: true)
+
+  """
+  @spec submodule(keyword()) ::
+          {:ok, [Git.SubmoduleEntry.t()]} | {:ok, :done} | {:ok, String.t()} | {:error, term()}
+  def submodule(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.Submodule, rest)
+    Git.Command.run(Git.Commands.Submodule, command, config)
+  end
+
+  @doc """
   Runs `git config` to read or write git configuration values.
 
   ## Options
@@ -981,5 +1030,203 @@ defmodule Git do
     {config, rest} = Keyword.pop(opts, :config, Config.new())
     command = struct!(Git.Commands.Grep, [{:pattern, pattern} | rest])
     Git.Command.run(Git.Commands.Grep, command, config)
+  end
+
+  @doc """
+  Runs `git describe` to find the most recent tag reachable from a commit.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:ref` - commit to describe (default: `nil`, describes HEAD)
+    * `:tags` - use any tag, not just annotated (`--tags`)
+    * `:all` - use any ref (`--all`)
+    * `:long` - always use long format (`--long`)
+    * `:first_parent` - follow only first parent (`--first-parent`)
+    * `:abbrev` - abbreviation length (`--abbrev=N`)
+    * `:exact_match` - only output exact matches (`--exact-match`)
+    * `:dirty` - describe with dirty suffix (`--dirty` or `--dirty=MARK`)
+    * `:always` - show abbreviated commit if no tag found (`--always`)
+    * `:match` - only consider tags matching glob (`--match=`)
+    * `:exclude` - exclude tags matching glob (`--exclude=`)
+    * `:candidates` - number of candidate tags to consider (`--candidates=N`)
+    * `:broken` - describe broken working tree as broken (`--broken`)
+
+  ## Examples
+
+      Git.describe(tags: true)
+      Git.describe(always: true, abbrev: 7)
+      Git.describe(exact_match: true, ref: "v1.0")
+
+  """
+  @spec describe(keyword()) :: {:ok, String.t()} | {:error, term()}
+  def describe(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.Describe, rest)
+    Git.Command.run(Git.Commands.Describe, command, config)
+  end
+
+  @doc """
+  Runs `git shortlog` to summarize log output by author.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:numbered` - sort by number of commits (`-n`)
+    * `:summary` - suppress commit descriptions, show count only (`-s`)
+    * `:email` - show email addresses (`-e`)
+    * `:group` - group by field (`--group=`, e.g. `"author"`, `"committer"`)
+    * `:ref` - ref range (e.g. `"v1.0..HEAD"`)
+    * `:max_count` - limit number of commits (`--max-count=N`)
+    * `:since` - show commits after date (`--since=`)
+    * `:until_date` - show commits before date (`--until=`)
+    * `:all` - all branches (`--all`)
+
+  ## Examples
+
+      Git.shortlog(summary: true, numbered: true)
+      Git.shortlog(email: true, ref: "v1.0..HEAD")
+
+  """
+  @spec shortlog(keyword()) :: {:ok, [Git.ShortlogEntry.t()]} | {:error, term()}
+  def shortlog(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.Shortlog, rest)
+    Git.Command.run(Git.Commands.Shortlog, command, config)
+  end
+
+  @doc """
+  Runs `git format-patch` to generate patch files from commits.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:ref` - revision range (required, e.g. `"HEAD~3"`, `"v1.0..v2.0"`)
+    * `:output_directory` - output directory (`-o`)
+    * `:numbered` - number patches in subject (`-n`)
+    * `:cover_letter` - generate cover letter (`--cover-letter`)
+    * `:stdout` - output patches to stdout (`--stdout`)
+    * `:from` - set From header (`--from=`)
+    * `:subject_prefix` - subject prefix (`--subject-prefix=`)
+    * `:no_stat` - suppress diffstat (`--no-stat`)
+    * `:start_number` - start numbering at N (`--start-number=N`)
+    * `:signature` - signature string (`--signature=`)
+    * `:no_signature` - suppress signature (`--no-signature`)
+    * `:quiet` - suppress output of file names (`-q`)
+    * `:zero_commit` - use zero commit hash in From header (`--zero-commit`)
+    * `:base` - record base tree info (`--base=`)
+
+  ## Examples
+
+      Git.format_patch(ref: "HEAD~3", output_directory: "/tmp/patches")
+      Git.format_patch(ref: "v1.0..v2.0", stdout: true)
+
+  """
+  @spec format_patch(keyword()) :: {:ok, [String.t()]} | {:ok, String.t()} | {:error, term()}
+  def format_patch(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.FormatPatch, rest)
+    Git.Command.run(Git.Commands.FormatPatch, command, config)
+  end
+
+  @doc """
+  Runs `git archive` to create an archive of files from a named tree.
+
+  Creates a tar, tar.gz, or zip archive of the repository contents.
+  The `output` option is currently required because git writes binary
+  archive data to stdout when no output file is specified, which cannot
+  be reliably captured as a string.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:ref` - tree-ish to archive (default `"HEAD"`)
+    * `:format` - archive format: `"tar"`, `"tar.gz"`, or `"zip"` (`--format=`)
+    * `:output` - output file path (`--output=`)
+    * `:prefix` - prepend prefix to each filename (`--prefix=`)
+    * `:paths` - restrict archive to these paths (after `--`)
+    * `:remote` - retrieve archive from a remote repository (`--remote=`)
+    * `:worktree_attributes` - use worktree attributes (`--worktree-attributes`)
+    * `:verbose` - report progress to stderr (`-v`)
+
+  ## Examples
+
+      Git.archive(output: "/tmp/repo.tar.gz", format: "tar.gz")
+      Git.archive(output: "/tmp/lib.zip", format: "zip", paths: ["lib/"])
+      Git.archive(output: "/tmp/v1.tar", ref: "v1.0.0", prefix: "project/")
+
+  """
+  @spec archive(keyword()) :: {:ok, :done} | {:error, term()}
+  def archive(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.Archive, rest)
+    Git.Command.run(Git.Commands.Archive, command, config)
+  end
+
+  @doc """
+  Runs `git ls-remote` to list references in a remote repository.
+
+  Returns a list of `Git.LsRemoteEntry` structs containing the SHA
+  and ref name for each reference in the remote.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:remote` - remote name or URL (default: origin)
+    * `:heads` - show only heads (`--heads`)
+    * `:tags` - show only tags (`--tags`)
+    * `:refs` - pattern to filter refs
+    * `:sort` - sort key (`--sort=`)
+    * `:symref` - show underlying ref for symbolic refs (`--symref`)
+    * `:quiet` - suppress output, exit with status only (`-q`)
+    * `:exit_code` - exit with status 2 when no matching refs (`--exit-code`)
+
+  ## Examples
+
+      Git.ls_remote(remote: "origin")
+      Git.ls_remote(heads: true)
+      Git.ls_remote(tags: true, remote: "https://github.com/owner/repo.git")
+
+  """
+  @spec ls_remote(keyword()) :: {:ok, [Git.LsRemoteEntry.t()]} | {:error, term()}
+  def ls_remote(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.LsRemote, rest)
+    Git.Command.run(Git.Commands.LsRemote, command, config)
+  end
+
+  @doc """
+  Runs `git ls-tree` to list the contents of a tree object.
+
+  Returns a list of `Git.TreeEntry` structs with mode, type, SHA, path,
+  and optionally size. When `:name_only` is `true`, returns a list of
+  path strings instead.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:ref` - tree-ish to list (default `"HEAD"`)
+    * `:recursive` - recurse into subtrees (`-r`)
+    * `:tree_only` - show only tree entries, not blobs (`-d`)
+    * `:long` - include object size (`-l`/`--long`)
+    * `:name_only` - show only paths (`--name-only`)
+    * `:abbrev` - abbreviate SHA to N characters (`--abbrev=N`)
+    * `:full_name` - show full path names (`--full-name`)
+    * `:full_tree` - show full tree regardless of current directory (`--full-tree`)
+    * `:path` - restrict to this path (after `--`)
+
+  ## Examples
+
+      Git.ls_tree()
+      Git.ls_tree(recursive: true)
+      Git.ls_tree(name_only: true, ref: "main")
+      Git.ls_tree(long: true, path: "lib/")
+
+  """
+  @spec ls_tree(keyword()) :: {:ok, [Git.TreeEntry.t()] | [String.t()]} | {:error, term()}
+  def ls_tree(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.LsTree, rest)
+    Git.Command.run(Git.Commands.LsTree, command, config)
   end
 end
