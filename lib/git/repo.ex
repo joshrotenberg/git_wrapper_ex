@@ -589,4 +589,93 @@ defmodule Git.Repo do
   def ls_tree(%__MODULE__{} = repo, opts \\ []) do
     Git.ls_tree(Keyword.put(opts, :config, repo.config))
   end
+
+  @doc """
+  Runs `git range-diff` on the repository.
+
+  See `Git.range_diff/1` for available options.
+  """
+  @spec range_diff(t(), keyword()) :: {:ok, String.t()} | {:error, term()}
+  def range_diff(%__MODULE__{} = repo, opts \\ []) do
+    Git.range_diff(Keyword.put(opts, :config, repo.config))
+  end
+
+  @doc """
+  Runs `git sparse-checkout` on the repository.
+
+  See `Git.sparse_checkout/1` for available options.
+  """
+  @spec sparse_checkout(t(), keyword()) ::
+          {:ok, [String.t()]} | {:ok, :done} | {:error, term()}
+  def sparse_checkout(%__MODULE__{} = repo, opts \\ []) do
+    Git.sparse_checkout(Keyword.put(opts, :config, repo.config))
+  end
+
+  @doc """
+  Runs `git rev-list` on the repository.
+
+  See `Git.rev_list/1` for available options.
+  """
+  @spec rev_list(t(), keyword()) ::
+          {:ok, [String.t()] | integer() | map()} | {:error, term()}
+  def rev_list(%__MODULE__{} = repo, opts \\ []) do
+    Git.rev_list(Keyword.put(opts, :config, repo.config))
+  end
+
+  @doc """
+  Runs `git merge-base` on the repository.
+
+  See `Git.merge_base/1` for available options.
+  """
+  @spec merge_base(t(), keyword()) ::
+          {:ok, String.t() | boolean() | [String.t()]} | {:error, term()}
+  def merge_base(%__MODULE__{} = repo, opts \\ []) do
+    Git.merge_base(Keyword.put(opts, :config, repo.config))
+  end
+
+  @doc """
+  Runs `git cherry` on the repository.
+
+  See `Git.cherry/1` for available options.
+  """
+  @spec cherry(t(), keyword()) :: {:ok, [Git.CherryEntry.t()]} | {:error, term()}
+  def cherry(%__MODULE__{} = repo, opts \\ []) do
+    Git.cherry(Keyword.put(opts, :config, repo.config))
+  end
+
+  @doc """
+  Runs `git cat-file` on the repository.
+
+  See `Git.cat_file/2` for available options.
+  """
+  @spec cat_file(t(), String.t(), keyword()) ::
+          {:ok, atom()}
+          | {:ok, integer()}
+          | {:ok, String.t()}
+          | {:ok, boolean()}
+          | {:error, term()}
+  def cat_file(%__MODULE__{} = repo, object, opts \\ []) do
+    Git.cat_file(object, Keyword.put(opts, :config, repo.config))
+  end
+
+  @doc """
+  Runs `git check-ignore` on the repository.
+
+  See `Git.check_ignore/1` for available options.
+  """
+  @spec check_ignore(t(), keyword()) :: {:ok, [String.t()] | [map()]} | {:error, term()}
+  def check_ignore(%__MODULE__{} = repo, opts \\ []) do
+    Git.check_ignore(Keyword.put(opts, :config, repo.config))
+  end
+
+  @doc """
+  Runs `git notes` on the repository.
+
+  See `Git.notes/1` for available options.
+  """
+  @spec notes(t(), keyword()) ::
+          {:ok, [map()]} | {:ok, String.t()} | {:ok, :done} | {:error, term()}
+  def notes(%__MODULE__{} = repo, opts \\ []) do
+    Git.notes(Keyword.put(opts, :config, repo.config))
+  end
 end
