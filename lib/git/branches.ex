@@ -183,8 +183,8 @@ defmodule Git.Branches do
   @spec recent(keyword()) ::
           {:ok, [%{name: String.t(), date: String.t(), author: String.t(), subject: String.t()}]}
           | {:error, term()}
-  # TODO: Promote `git for-each-ref` to a proper Git.Commands.ForEachRef module
-  # so this function can use the command-based pipeline instead of raw System.cmd.
+  # NOTE: Uses raw System.cmd since there is no Git.Commands.ForEachRef module yet.
+  # See https://github.com/joshrotenberg/git_wrapper_ex/issues/56 for tracking.
   def recent(opts \\ []) do
     {count, opts} = Keyword.pop(opts, :count, 10)
     config = Keyword.get(opts, :config, Config.new())
