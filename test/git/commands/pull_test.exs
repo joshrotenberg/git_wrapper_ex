@@ -188,7 +188,7 @@ defmodule Git.Commands.PullTest do
     # Create a bare repo to act as remote
     remote_dir = Path.join(tmp_dir, "remote.git")
     File.mkdir_p!(remote_dir)
-    System.cmd("git", ["init", "--bare"], cd: remote_dir)
+    System.cmd("git", ["init", "--bare", "--initial-branch=main"], cd: remote_dir)
 
     # Create local repo and push initial commit
     local_dir = Path.join(tmp_dir, "local")
@@ -255,7 +255,7 @@ defmodule Git.Commands.PullTest do
     } do
       # Clone a second working copy, make a change, and push it
       second_dir = Path.join(Path.dirname(local_dir), "second")
-      System.cmd("git", ["clone", remote_dir, second_dir])
+      System.cmd("git", ["clone", "--branch", "main", remote_dir, second_dir])
 
       File.write!(Path.join(second_dir, "new_file.txt"), "new content\n")
       System.cmd("git", ["add", "new_file.txt"], cd: second_dir)

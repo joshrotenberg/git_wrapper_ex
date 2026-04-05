@@ -111,7 +111,7 @@ defmodule Git.Commands.PushTest do
     # Create a bare repo to act as remote
     remote_dir = Path.join(tmp_dir, "remote.git")
     File.mkdir_p!(remote_dir)
-    System.cmd("git", ["init", "--bare"], cd: remote_dir)
+    System.cmd("git", ["init", "--bare", "--initial-branch=main"], cd: remote_dir)
 
     # Create local repo
     local_dir = Path.join(tmp_dir, "local")

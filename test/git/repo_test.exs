@@ -22,21 +22,9 @@ defmodule Git.RepoTest do
   defp init_repo(dir) do
     File.mkdir_p!(dir)
     System.cmd("git", ["init", "--initial-branch=main"], cd: dir)
-
-    System.cmd(
-      "git",
-      [
-        "-c",
-        "user.name=Test User",
-        "-c",
-        "user.email=test@test.com",
-        "commit",
-        "--allow-empty",
-        "-m",
-        "initial"
-      ],
-      cd: dir
-    )
+    System.cmd("git", ["config", "user.name", "Test User"], cd: dir)
+    System.cmd("git", ["config", "user.email", "test@test.com"], cd: dir)
+    System.cmd("git", ["commit", "--allow-empty", "-m", "initial"], cd: dir)
 
     dir
   end
