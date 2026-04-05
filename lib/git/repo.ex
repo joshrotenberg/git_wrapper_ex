@@ -678,4 +678,75 @@ defmodule Git.Repo do
   def notes(%__MODULE__{} = repo, opts \\ []) do
     Git.notes(Keyword.put(opts, :config, repo.config))
   end
+
+  @doc """
+  Runs `git verify-commit` on the repository.
+
+  See `Git.verify_commit/2` for available options.
+  """
+  @spec verify_commit(t(), String.t(), keyword()) :: {:ok, map()} | {:error, term()}
+  def verify_commit(%__MODULE__{} = repo, commit, opts \\ []) do
+    Git.verify_commit(commit, Keyword.put(opts, :config, repo.config))
+  end
+
+  @doc """
+  Runs `git verify-tag` on the repository.
+
+  See `Git.verify_tag/2` for available options.
+  """
+  @spec verify_tag(t(), String.t(), keyword()) :: {:ok, map()} | {:error, term()}
+  def verify_tag(%__MODULE__{} = repo, tag, opts \\ []) do
+    Git.verify_tag(tag, Keyword.put(opts, :config, repo.config))
+  end
+
+  @doc """
+  Runs `git gc` on the repository.
+
+  See `Git.gc/1` for available options.
+  """
+  @spec gc(t(), keyword()) :: {:ok, :done} | {:error, term()}
+  def gc(%__MODULE__{} = repo, opts \\ []) do
+    Git.gc(Keyword.put(opts, :config, repo.config))
+  end
+
+  @doc """
+  Runs `git rerere` on the repository.
+
+  See `Git.rerere/1` for available options.
+  """
+  @spec rerere(t(), keyword()) ::
+          {:ok, [String.t()]} | {:ok, String.t()} | {:ok, :done} | {:error, term()}
+  def rerere(%__MODULE__{} = repo, opts \\ []) do
+    Git.rerere(Keyword.put(opts, :config, repo.config))
+  end
+
+  @doc """
+  Runs `git fsck` on the repository.
+
+  See `Git.fsck/1` for available options.
+  """
+  @spec fsck(t(), keyword()) :: {:ok, [map()]} | {:error, term()}
+  def fsck(%__MODULE__{} = repo, opts \\ []) do
+    Git.fsck(Keyword.put(opts, :config, repo.config))
+  end
+
+  @doc """
+  Runs `git bundle` on the repository.
+
+  See `Git.bundle/1` for available options.
+  """
+  @spec bundle(t(), keyword()) :: {:ok, term()} | {:error, term()}
+  def bundle(%__MODULE__{} = repo, opts \\ []) do
+    Git.bundle(Keyword.put(opts, :config, repo.config))
+  end
+
+  @doc """
+  Runs `git show-ref` on the repository.
+
+  See `Git.show_ref/1` for available options.
+  """
+  @spec show_ref(t(), keyword()) :: {:ok, term()} | {:error, term()}
+  def show_ref(%__MODULE__{} = repo, opts \\ []) do
+    Git.show_ref(Keyword.put(opts, :config, repo.config))
+  end
 end
