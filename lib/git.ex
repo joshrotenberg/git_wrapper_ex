@@ -1229,4 +1229,272 @@ defmodule Git do
     command = struct!(Git.Commands.LsTree, rest)
     Git.Command.run(Git.Commands.LsTree, command, config)
   end
+
+  @doc """
+  Runs `git rev-list` to list commit objects.
+
+  Returns a list of SHAs by default. With `count: true` returns an integer.
+  With `left_right: true` and `count: true` returns a map with `:left` and
+  `:right` counts.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:ref` - rev range (e.g. `"HEAD"`, `"main..feature"`)
+    * `:max_count` - limit number of commits (`--max-count=N`)
+    * `:skip` - skip N commits (`--skip=N`)
+    * `:count` - output a count instead of SHAs (`--count`)
+    * `:left_right` - mark which side of a symmetric diff (`--left-right`)
+    * `:ancestry_path` - only show commits on the ancestry path (`--ancestry-path`)
+    * `:first_parent` - follow only first parent (`--first-parent`)
+    * `:merges` - only show merge commits (`--merges`)
+    * `:no_merges` - exclude merge commits (`--no-merges`)
+    * `:reverse` - reverse output order (`--reverse`)
+    * `:since` - show commits after date (`--since=`)
+    * `:until_date` - show commits before date (`--until=`)
+    * `:author` - filter by author (`--author=`)
+    * `:all` - list objects from all refs (`--all`)
+    * `:objects` - list objects, not just commits (`--objects`)
+    * `:no_walk` - do not traverse ancestors (`--no-walk`)
+
+  ## Examples
+
+      Git.rev_list(ref: "HEAD", max_count: 10)
+      Git.rev_list(ref: "main..feature", count: true)
+      Git.rev_list(ref: "main...feature", left_right: true, count: true)
+
+  """
+  @spec rev_list(keyword()) ::
+          {:ok, [String.t()] | integer() | map()} | {:error, term()}
+  def rev_list(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.RevList, rest)
+    Git.Command.run(Git.Commands.RevList, command, config)
+  end
+
+  @doc """
+  Runs `git merge-base` to find the best common ancestor(s).
+
+  By default returns a single ancestor SHA. With `is_ancestor: true`,
+  returns a boolean indicating whether the first commit is an ancestor
+  of the second. With `all: true` or `independent: true`, returns a
+  list of SHAs.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:commits` - list of commit refs to compare (two or more)
+    * `:is_ancestor` - check if first is ancestor of second (`--is-ancestor`)
+    * `:fork_point` - find fork point (`--fork-point`)
+    * `:octopus` - find octopus merge base (`--octopus`)
+    * `:all` - output all merge bases (`--all`)
+    * `:independent` - list independent commits (`--independent`)
+
+  ## Examples
+
+      Git.merge_base(commits: ["main", "feature"])
+      Git.merge_base(commits: ["main", "feature"], is_ancestor: true)
+      Git.merge_base(commits: ["main", "feature"], all: true)
+
+  """
+  @spec merge_base(keyword()) ::
+          {:ok, String.t() | boolean() | [String.t()]} | {:error, term()}
+  def merge_base(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.MergeBase, rest)
+    Git.Command.run(Git.Commands.MergeBase, command, config)
+  end
+
+  @doc """
+  Runs `git cherry` to find commits not yet applied upstream.
+
+  Returns a list of `Git.CherryEntry` structs. Each entry indicates
+  whether a commit has already been applied upstream and includes the
+  SHA (and subject when `verbose: true`).
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:upstream` - upstream branch (required)
+    * `:head` - head branch (default: HEAD)
+    * `:limit` - limit ref
+    * `:verbose` - include commit subject (`-v`)
+
+  ## Examples
+
+      Git.cherry(upstream: "main")
+      Git.cherry(upstream: "main", head: "feature", verbose: true)
+
+  """
+  @spec cherry(keyword()) :: {:ok, [Git.CherryEntry.t()]} | {:error, term()}
+  def cherry(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.Cherry, rest)
+    Git.Command.run(Git.Commands.Cherry, command, config)
+  end
+
+  @doc """
+  Runs `git range-diff` to compare two sequences of commits.
+
+  Supports both the two-range form (using `range1` and `range2`) and the
+  three-argument form (using `rev1`, `rev2`, and `rev3`).
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:range1` - first revision range (e.g. `"main..topic-v1"`)
+    * `:range2` - second revision range (e.g. `"main..topic-v2"`)
+    * `:rev1` - base revision (three-arg form)
+    * `:rev2` - first revision (three-arg form)
+    * `:rev3` - second revision (three-arg form)
+    * `:stat` - show diffstat (`--stat`)
+    * `:no_patch` - suppress diff output (`--no-patch`)
+    * `:creation_factor` - percentage for matching commits (`--creation-factor=N`)
+    * `:no_dual_color` - disable dual-color mode (`--no-dual-color`)
+    * `:left_only` - show only left-side commits (`--left-only`)
+    * `:right_only` - show only right-side commits (`--right-only`)
+    * `:no_notes` - do not show notes (`--no-notes`)
+
+  ## Examples
+
+      Git.range_diff(range1: "main..topic-v1", range2: "main..topic-v2")
+      Git.range_diff(rev1: "main", rev2: "topic-v1", rev3: "topic-v2")
+      Git.range_diff(range1: "main..v1", range2: "main..v2", stat: true)
+
+  """
+  @spec range_diff(keyword()) :: {:ok, String.t()} | {:error, term()}
+  def range_diff(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.RangeDiff, rest)
+    Git.Command.run(Git.Commands.RangeDiff, command, config)
+  end
+
+  @doc """
+  Runs `git sparse-checkout` to manage sparse-checkout patterns.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:init` - initialize sparse-checkout
+    * `:set` - list of patterns to set
+    * `:add` - list of patterns to add
+    * `:list` - list current patterns (default `true`)
+    * `:disable` - disable sparse-checkout
+    * `:reapply` - reapply current sparse-checkout rules
+    * `:check_rules` - check sparse-checkout rules
+    * `:cone` - use cone mode (`--cone`)
+    * `:no_cone` - use non-cone mode (`--no-cone`)
+    * `:sparse_index` - use sparse index (`--sparse-index`)
+    * `:no_sparse_index` - do not use sparse index (`--no-sparse-index`)
+
+  ## Examples
+
+      Git.sparse_checkout()
+      Git.sparse_checkout(init: true, cone: true)
+      Git.sparse_checkout(set: ["src/", "docs/"])
+      Git.sparse_checkout(disable: true)
+
+  """
+  @spec sparse_checkout(keyword()) ::
+          {:ok, [String.t()]} | {:ok, :done} | {:error, term()}
+  def sparse_checkout(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.SparseCheckout, rest)
+    Git.Command.run(Git.Commands.SparseCheckout, command, config)
+  end
+
+  @doc """
+  Runs `git cat-file` to provide content or type/size info for repository objects.
+
+  The object (SHA or ref) is required as the first argument.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:type` - show object type (`-t`)
+    * `:size` - show object size (`-s`)
+    * `:print` - pretty-print object content (`-p`)
+    * `:exists` - check if object exists (`-e`); returns `{:ok, true}` or `{:ok, false}`
+    * `:textconv` - show content with textconv filter (`--textconv`)
+    * `:filters` - show content with filters applied (`--filters`)
+
+  ## Examples
+
+      Git.cat_file("HEAD", type: true)
+      Git.cat_file("abc1234", size: true)
+      Git.cat_file("HEAD", print: true)
+      Git.cat_file("deadbeef", exists: true)
+
+  """
+  @spec cat_file(String.t(), keyword()) ::
+          {:ok, atom()}
+          | {:ok, integer()}
+          | {:ok, String.t()}
+          | {:ok, boolean()}
+          | {:error, term()}
+  def cat_file(object, opts \\ []) when is_binary(object) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.CatFile, [{:object, object} | rest])
+    Git.Command.run(Git.Commands.CatFile, command, config)
+  end
+
+  @doc """
+  Runs `git check-ignore` to test whether paths are ignored by `.gitignore`.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:paths` - list of paths to check (required)
+    * `:verbose` - show matching pattern info (`-v`)
+    * `:non_matching` - also show non-matching paths (`-n`, requires `-v`)
+    * `:no_index` - do not look at the index (`--no-index`)
+    * `:quiet` - suppress output, use exit status only (`-q`)
+
+  ## Examples
+
+      Git.check_ignore(paths: ["build/", "tmp.log"])
+      Git.check_ignore(paths: ["src/main.ex"], verbose: true)
+
+  """
+  @spec check_ignore(keyword()) :: {:ok, [String.t()] | [map()]} | {:error, term()}
+  def check_ignore(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.CheckIgnore, rest)
+    Git.Command.run(Git.Commands.CheckIgnore, command, config)
+  end
+
+  @doc """
+  Runs `git notes` to manage notes attached to objects.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:list` - list notes (default `true`)
+    * `:show` - show note for a ref (string)
+    * `:add` - add a note (boolean)
+    * `:append` - append to an existing note (boolean)
+    * `:message` - note message (`-m`, for add/append)
+    * `:ref` - commit ref for add/append/show
+    * `:force` - overwrite existing note (`-f`)
+    * `:remove` - remove note from ref (string)
+    * `:prune` - prune notes for unreachable objects (boolean)
+    * `:notes_ref` - use alternate notes ref (`--ref=`)
+
+  Note: `notes edit` is not supported because it launches an interactive editor.
+
+  ## Examples
+
+      Git.notes()
+      Git.notes(show: "HEAD")
+      Git.notes(add: true, message: "review passed", ref: "HEAD")
+      Git.notes(remove: "HEAD")
+
+  """
+  @spec notes(keyword()) ::
+          {:ok, [map()]} | {:ok, String.t()} | {:ok, :done} | {:error, term()}
+  def notes(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.Notes, rest)
+    Git.Command.run(Git.Commands.Notes, command, config)
+  end
 end
