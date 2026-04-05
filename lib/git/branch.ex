@@ -17,7 +17,15 @@ defmodule Git.Branch do
           behind: non_neg_integer()
         }
 
-  defstruct [:name, :upstream, current: false, worktree: false, remote: false, ahead: 0, behind: 0]
+  defstruct [
+    :name,
+    :upstream,
+    current: false,
+    worktree: false,
+    remote: false,
+    ahead: 0,
+    behind: 0
+  ]
 
   @doc """
   Parses the output of `git branch -vv` into a list of `Git.Branch` structs.

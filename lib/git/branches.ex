@@ -133,17 +133,12 @@ defmodule Git.Branches do
       to_delete =
         branches
         |> Enum.map(& &1.name)
-        |> Enum.reject(&(&1 == current_name))
-        |> Enum.reject(&(&1 in exclude))
+        |> Enum.reject(&(&1 == current_name or &1 in exclude))
 
       if dry_run do
         {:ok, to_delete}
       else
-        Enum.each(to_delete, fn name ->
-          Git.branch(Keyword.merge(opts, delete: name, force_delete: force))
-        end)
-
-        {:ok, to_delete}
+        delete_branches(to_delete, opts, force)
       end
     end
   end
@@ -164,8 +159,7 @@ defmodule Git.Branches do
     if exit_code == 0 do
       case stdout |> String.trim() |> String.split("\t") do
         [ahead_str, behind_str] ->
-          {:ok,
-           %{ahead: String.to_integer(ahead_str), behind: String.to_integer(behind_str)}}
+          {:ok, %{ahead: String.to_integer(ahead_str), behind: String.to_integer(behind_str)}}
 
         _ ->
           {:error, {:parse_error, stdout}}
@@ -187,8 +181,7 @@ defmodule Git.Branches do
   Returns `{:ok, [%{name: String.t(), date: String.t(), author: String.t(), subject: String.t()}]}`.
   """
   @spec recent(keyword()) ::
-          {:ok,
-           [%{name: String.t(), date: String.t(), author: String.t(), subject: String.t()}]}
+          {:ok, [%{name: String.t(), date: String.t(), author: String.t(), subject: String.t()}]}
           | {:error, term()}
   def recent(opts \\ []) do
     {count, opts} = Keyword.pop(opts, :count, 10)
@@ -206,23 +199,7 @@ defmodule Git.Branches do
     {stdout, exit_code} = run_raw(args, opts)
 
     if exit_code == 0 do
-      entries =
-        stdout
-        |> String.split("\n", trim: true)
-        |> Enum.map(fn line ->
-          case String.split(line, "\t", parts: 4) do
-            [name, date, author, subject] ->
-              %{name: name, date: date, author: author, subject: subject}
-
-            [name, date, author] ->
-              %{name: name, date: date, author: author, subject: ""}
-
-            _ ->
-              %{name: line, date: "", author: "", subject: ""}
-          end
-        end)
-
-      {:ok, entries}
+      {:ok, parse_recent_entries(stdout)}
     else
       {:error, {stdout, exit_code}}
     end
@@ -252,6 +229,31 @@ defmodule Git.Branches do
   # ---------------------------------------------------------------------------
   # Private helpers
   # ---------------------------------------------------------------------------
+
+  defp delete_branches(to_delete, opts, force) do
+    Enum.each(to_delete, fn name ->
+      Git.branch(Keyword.merge(opts, delete: name, force_delete: force))
+    end)
+
+    {:ok, to_delete}
+  end
+
+  defp parse_recent_entries(stdout) do
+    stdout
+    |> String.split("\n", trim: true)
+    |> Enum.map(fn line ->
+      case String.split(line, "\t", parts: 4) do
+        [name, date, author, subject] ->
+          %{name: name, date: date, author: author, subject: subject}
+
+        [name, date, author] ->
+          %{name: name, date: date, author: author, subject: ""}
+
+        _ ->
+          %{name: line, date: "", author: "", subject: ""}
+      end
+    end)
+  end
 
   defp run_raw(args, opts) do
     config = Keyword.get(opts, :config, Config.new())

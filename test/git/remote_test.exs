@@ -1,8 +1,8 @@
 defmodule Git.RemoteTest do
   use ExUnit.Case, async: true
 
-  alias Git.Remote
   alias Git.Commands.Remote, as: RemoteCmd
+  alias Git.Remote
 
   # ---------------------------------------------------------------------------
   # Test helpers

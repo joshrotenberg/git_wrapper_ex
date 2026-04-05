@@ -163,12 +163,12 @@ defmodule Git.History do
 
   ## Examples
 
-      {:ok, true} = Git.History.is_ancestor?("v1.0.0", "main")
+      {:ok, true} = Git.History.ancestor?("v1.0.0", "main")
 
   """
-  @spec is_ancestor?(String.t(), String.t(), keyword()) ::
+  @spec ancestor?(String.t(), String.t(), keyword()) ::
           {:ok, boolean()} | {:error, term()}
-  def is_ancestor?(ref1, ref2, opts \\ []) do
+  def ancestor?(ref1, ref2, opts \\ []) do
     {config, _rest} = extract_config(opts)
     args = ["merge-base", "--is-ancestor", ref1, ref2]
     cmd_opts = Config.cmd_opts(config)

@@ -2,8 +2,8 @@ defmodule Git.RebaseTest do
   use ExUnit.Case, async: true
 
   alias Git.Commands.Rebase
-  alias Git.RebaseResult
   alias Git.Config
+  alias Git.RebaseResult
 
   @env [
     {"GIT_AUTHOR_NAME", "Test User"},

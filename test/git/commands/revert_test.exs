@@ -2,8 +2,8 @@ defmodule Git.RevertTest do
   use ExUnit.Case, async: true
 
   alias Git.Commands.Revert
-  alias Git.RevertResult
   alias Git.Config
+  alias Git.RevertResult
 
   setup do
     tmp_dir =

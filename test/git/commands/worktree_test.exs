@@ -1,8 +1,8 @@
 defmodule Git.WorktreeTest do
   use ExUnit.Case, async: true
 
-  alias Git.{Config, Worktree}
   alias Git.Commands.Worktree, as: WorktreeCmd
+  alias Git.{Config, Worktree}
 
   setup do
     tmp_dir =
@@ -83,7 +83,7 @@ defmodule Git.WorktreeTest do
                Git.Command.run(WorktreeCmd, %WorktreeCmd{}, config)
 
       assert is_list(worktrees)
-      assert length(worktrees) >= 1
+      assert worktrees != []
 
       [main_wt | _] = worktrees
       assert %Worktree{} = main_wt

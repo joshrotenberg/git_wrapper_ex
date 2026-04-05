@@ -1,8 +1,8 @@
 defmodule Git.CherryPickTest do
   use ExUnit.Case, async: true
 
-  alias Git.Commands.CherryPick
   alias Git.CherryPickResult
+  alias Git.Commands.CherryPick
   alias Git.Config
 
   @env [

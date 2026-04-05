@@ -1,8 +1,8 @@
 defmodule Git.DiffTest do
   use ExUnit.Case, async: true
 
-  alias Git.Diff
   alias Git.Commands.Diff, as: DiffCmd
+  alias Git.Diff
 
   # ---------------------------------------------------------------------------
   # Test helpers

@@ -1,8 +1,8 @@
 defmodule Git.MergeTest do
   use ExUnit.Case, async: true
 
-  alias Git.MergeResult
   alias Git.Config
+  alias Git.MergeResult
 
   setup do
     tmp_dir =

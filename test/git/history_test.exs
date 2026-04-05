@@ -196,10 +196,10 @@ defmodule Git.HistoryTest do
   end
 
   # ---------------------------------------------------------------------------
-  # is_ancestor?/3
+  # ancestor?/3
   # ---------------------------------------------------------------------------
 
-  describe "is_ancestor?/3" do
+  describe "ancestor?/3" do
     test "returns true when ref1 is an ancestor of ref2" do
       {config, dir} = setup_repo()
       git_commit(dir, "feat: first")
@@ -207,7 +207,7 @@ defmodule Git.HistoryTest do
       git_commit(dir, "feat: second")
       create_tag(dir, "v2.0.0")
 
-      assert {:ok, true} = Git.History.is_ancestor?("v1.0.0", "v2.0.0", config: config)
+      assert {:ok, true} = Git.History.ancestor?("v1.0.0", "v2.0.0", config: config)
     end
 
     test "returns false when ref1 is not an ancestor of ref2" do
@@ -217,7 +217,7 @@ defmodule Git.HistoryTest do
       git_commit(dir, "feat: second")
       create_tag(dir, "v2.0.0")
 
-      assert {:ok, false} = Git.History.is_ancestor?("v2.0.0", "v1.0.0", config: config)
+      assert {:ok, false} = Git.History.ancestor?("v2.0.0", "v1.0.0", config: config)
     end
 
     test "returns true when refs are the same" do
@@ -225,7 +225,7 @@ defmodule Git.HistoryTest do
       git_commit(dir, "feat: first")
       create_tag(dir, "v1.0.0")
 
-      assert {:ok, true} = Git.History.is_ancestor?("v1.0.0", "v1.0.0", config: config)
+      assert {:ok, true} = Git.History.ancestor?("v1.0.0", "v1.0.0", config: config)
     end
   end
 

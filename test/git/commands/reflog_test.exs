@@ -1,8 +1,8 @@
 defmodule Git.ReflogTest do
   use ExUnit.Case, async: true
 
-  alias Git.{Config, ReflogEntry}
   alias Git.Commands.Reflog
+  alias Git.{Config, ReflogEntry}
 
   setup do
     tmp_dir =
@@ -80,7 +80,7 @@ defmodule Git.ReflogTest do
                Git.Command.run(Reflog, %Reflog{}, config)
 
       assert is_list(entries)
-      assert length(entries) >= 1
+      assert entries != []
 
       [latest | _] = entries
       assert %ReflogEntry{} = latest

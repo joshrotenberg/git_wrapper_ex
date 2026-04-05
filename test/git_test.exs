@@ -1,8 +1,8 @@
 defmodule GitTest do
   use ExUnit.Case
 
-  alias Git.Config
   alias Git.Commands.{Commit, Log}
+  alias Git.Config
 
   # ---------------------------------------------------------------------------
   # Test helpers

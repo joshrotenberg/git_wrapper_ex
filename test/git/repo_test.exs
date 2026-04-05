@@ -22,7 +22,22 @@ defmodule Git.RepoTest do
   defp init_repo(dir) do
     File.mkdir_p!(dir)
     System.cmd("git", ["init", "--initial-branch=main"], cd: dir)
-    System.cmd("git", ["-c", "user.name=Test User", "-c", "user.email=test@test.com", "commit", "--allow-empty", "-m", "initial"], cd: dir)
+
+    System.cmd(
+      "git",
+      [
+        "-c",
+        "user.name=Test User",
+        "-c",
+        "user.email=test@test.com",
+        "commit",
+        "--allow-empty",
+        "-m",
+        "initial"
+      ],
+      cd: dir
+    )
+
     dir
   end
 
@@ -47,7 +62,8 @@ defmodule Git.RepoTest do
     end
 
     test "returns error for non-existent path" do
-      assert {:error, _} = Repo.open("/tmp/nonexistent_path_#{:erlang.unique_integer([:positive])}")
+      assert {:error, _} =
+               Repo.open("/tmp/nonexistent_path_#{:erlang.unique_integer([:positive])}")
     end
 
     test "returns error for non-repo directory" do
@@ -129,7 +145,7 @@ defmodule Git.RepoTest do
     test "returns log entries", %{tmp_dir: dir} do
       {:ok, repo} = Repo.open(dir)
       assert {:ok, commits} = Repo.log(repo)
-      assert length(commits) >= 1
+      assert commits != []
       assert hd(commits).subject == "initial"
     end
   end
@@ -188,7 +204,20 @@ defmodule Git.RepoTest do
       {:ok, repo} = Repo.open(dir)
       File.write!(Path.join(dir, "tracked.txt"), "content")
       System.cmd("git", ["add", "tracked.txt"], cd: dir)
-      System.cmd("git", ["-c", "user.name=Test User", "-c", "user.email=test@test.com", "commit", "-m", "add file"], cd: dir)
+
+      System.cmd(
+        "git",
+        [
+          "-c",
+          "user.name=Test User",
+          "-c",
+          "user.email=test@test.com",
+          "commit",
+          "-m",
+          "add file"
+        ],
+        cd: dir
+      )
 
       assert {:ok, files} = Repo.ls_files(repo)
       assert "tracked.txt" in files

@@ -173,7 +173,8 @@ defmodule Git.HooksTest do
 
   describe "invalid hook name" do
     test "write rejects invalid hook name", %{config: config} do
-      assert {:error, :invalid_hook} = Git.Hooks.write("not-a-hook", "#!/bin/sh\n", config: config)
+      assert {:error, :invalid_hook} =
+               Git.Hooks.write("not-a-hook", "#!/bin/sh\n", config: config)
     end
 
     test "read rejects invalid hook name", %{config: config} do

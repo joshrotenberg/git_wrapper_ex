@@ -1,8 +1,8 @@
 defmodule Git.LsFilesTest do
   use ExUnit.Case, async: true
 
-  alias Git.Config
   alias Git.Commands.LsFiles
+  alias Git.Config
 
   setup do
     tmp_dir =

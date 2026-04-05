@@ -1,8 +1,8 @@
 defmodule Git.GitConfigTest do
   use ExUnit.Case, async: true
 
-  alias Git.Config
   alias Git.Commands.GitConfig
+  alias Git.Config
 
   setup do
     tmp_dir =

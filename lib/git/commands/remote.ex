@@ -72,25 +72,26 @@ defmodule Git.Commands.Remote do
         {:ok, :done}
 
       :list ->
-        cond do
-          stdout == "" ->
-            {:ok, []}
-
-          String.contains?(stdout, "\t") ->
-            {:ok, Remote.parse_verbose(stdout)}
-
-          true ->
-            remotes =
-              stdout
-              |> String.split("\n", trim: true)
-              |> Enum.map(fn name -> %Remote{name: String.trim(name)} end)
-
-            {:ok, remotes}
-        end
+        parse_list_output(stdout)
     end
   end
 
   def parse_output(stdout, exit_code) do
     {:error, {stdout, exit_code}}
+  end
+
+  defp parse_list_output(""), do: {:ok, []}
+
+  defp parse_list_output(stdout) do
+    if String.contains?(stdout, "\t") do
+      {:ok, Remote.parse_verbose(stdout)}
+    else
+      remotes =
+        stdout
+        |> String.split("\n", trim: true)
+        |> Enum.map(fn name -> %Remote{name: String.trim(name)} end)
+
+      {:ok, remotes}
+    end
   end
 end

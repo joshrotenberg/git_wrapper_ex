@@ -40,29 +40,11 @@ defmodule Git.Hooks do
       # => [%{name: "pre-commit", enabled: true, path: "/repo/.git/hooks/pre-commit"}]
 
   """
-  @spec list(keyword()) :: {:ok, [%{name: String.t(), enabled: boolean(), path: String.t()}]} | {:error, term()}
+  @spec list(keyword()) ::
+          {:ok, [%{name: String.t(), enabled: boolean(), path: String.t()}]} | {:error, term()}
   def list(opts \\ []) do
     with {:ok, dir} <- hooks_dir(opts) do
-      hooks =
-        if File.dir?(dir) do
-          dir
-          |> File.ls!()
-          |> Enum.filter(&(&1 in @valid_hooks))
-          |> Enum.sort()
-          |> Enum.map(fn name ->
-            path = Path.join(dir, name)
-
-            %{
-              name: name,
-              enabled: executable?(path),
-              path: path
-            }
-          end)
-        else
-          []
-        end
-
-      {:ok, hooks}
+      {:ok, list_hooks_in_dir(dir)}
     end
   end
 
@@ -76,7 +58,8 @@ defmodule Git.Hooks do
   Returns `{:ok, content}` or `{:error, :not_found}`.
   Returns `{:error, :invalid_hook}` if the hook name is not valid.
   """
-  @spec read(String.t(), keyword()) :: {:ok, String.t()} | {:error, :not_found | :invalid_hook | term()}
+  @spec read(String.t(), keyword()) ::
+          {:ok, String.t()} | {:error, :not_found | :invalid_hook | term()}
   def read(hook_name, opts \\ []) do
     with :ok <- validate_hook(hook_name),
          {:ok, path} <- hook_path(hook_name, opts) do
@@ -102,7 +85,8 @@ defmodule Git.Hooks do
   Returns `{:ok, path}` or `{:error, reason}`.
   Returns `{:error, :invalid_hook}` if the hook name is not valid.
   """
-  @spec write(String.t(), String.t(), keyword()) :: {:ok, String.t()} | {:error, :invalid_hook | term()}
+  @spec write(String.t(), String.t(), keyword()) ::
+          {:ok, String.t()} | {:error, :invalid_hook | term()}
   def write(hook_name, content, opts \\ []) do
     executable = Keyword.get(opts, :executable, true)
 
@@ -110,18 +94,7 @@ defmodule Git.Hooks do
          {:ok, dir} <- hooks_dir(opts) do
       File.mkdir_p!(dir)
       path = Path.join(dir, hook_name)
-
-      case File.write(path, content) do
-        :ok ->
-          if executable do
-            File.chmod!(path, 0o755)
-          end
-
-          {:ok, path}
-
-        {:error, reason} ->
-          {:error, reason}
-      end
+      write_hook_file(path, content, executable)
     end
   end
 
@@ -135,7 +108,8 @@ defmodule Git.Hooks do
   Returns `{:ok, path}` or `{:error, :not_found}`.
   Returns `{:error, :invalid_hook}` if the hook name is not valid.
   """
-  @spec enable(String.t(), keyword()) :: {:ok, String.t()} | {:error, :not_found | :invalid_hook | term()}
+  @spec enable(String.t(), keyword()) ::
+          {:ok, String.t()} | {:error, :not_found | :invalid_hook | term()}
   def enable(hook_name, opts \\ []) do
     with :ok <- validate_hook(hook_name),
          {:ok, path} <- hook_path(hook_name, opts) do
@@ -158,7 +132,8 @@ defmodule Git.Hooks do
   Returns `{:ok, path}` or `{:error, :not_found}`.
   Returns `{:error, :invalid_hook}` if the hook name is not valid.
   """
-  @spec disable(String.t(), keyword()) :: {:ok, String.t()} | {:error, :not_found | :invalid_hook | term()}
+  @spec disable(String.t(), keyword()) ::
+          {:ok, String.t()} | {:error, :not_found | :invalid_hook | term()}
   def disable(hook_name, opts \\ []) do
     with :ok <- validate_hook(hook_name),
          {:ok, path} <- hook_path(hook_name, opts) do
@@ -232,6 +207,40 @@ defmodule Git.Hooks do
   # ---------------------------------------------------------------------------
   # Private helpers
   # ---------------------------------------------------------------------------
+
+  defp list_hooks_in_dir(dir) do
+    if File.dir?(dir) do
+      dir
+      |> File.ls!()
+      |> Enum.filter(&(&1 in @valid_hooks))
+      |> Enum.sort()
+      |> Enum.map(fn name ->
+        path = Path.join(dir, name)
+
+        %{
+          name: name,
+          enabled: executable?(path),
+          path: path
+        }
+      end)
+    else
+      []
+    end
+  end
+
+  defp write_hook_file(path, content, executable) do
+    case File.write(path, content) do
+      :ok ->
+        if executable do
+          File.chmod!(path, 0o755)
+        end
+
+        {:ok, path}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
 
   defp hooks_dir(opts) do
     config = Keyword.get(opts, :config, Git.Config.new())

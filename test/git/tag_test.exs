@@ -1,8 +1,8 @@
 defmodule Git.TagTest do
   use ExUnit.Case, async: true
 
-  alias Git.Tag
   alias Git.Commands.Tag, as: TagCmd
+  alias Git.Tag
 
   # ---------------------------------------------------------------------------
   # Test helpers

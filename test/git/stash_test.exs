@@ -1,8 +1,8 @@
 defmodule Git.StashTest do
   use ExUnit.Case, async: true
 
-  alias Git.StashEntry
   alias Git.Commands.Stash, as: StashCmd
+  alias Git.StashEntry
 
   # ---------------------------------------------------------------------------
   # Test helpers

@@ -1,8 +1,8 @@
 defmodule Git.BlameTest do
   use ExUnit.Case, async: true
 
-  alias Git.Commands.Blame
   alias Git.BlameEntry
+  alias Git.Commands.Blame
   alias Git.Config
 
   @env [

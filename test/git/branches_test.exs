@@ -13,7 +13,16 @@ defmodule Git.BranchesTest do
 
     System.cmd(
       "git",
-      ["-c", "user.name=Test User", "-c", "user.email=test@test.com", "commit", "--allow-empty", "-m", "initial"],
+      [
+        "-c",
+        "user.name=Test User",
+        "-c",
+        "user.email=test@test.com",
+        "commit",
+        "--allow-empty",
+        "-m",
+        "initial"
+      ],
       cd: tmp_dir
     )
 
@@ -37,7 +46,16 @@ defmodule Git.BranchesTest do
   defp commit(tmp_dir, message) do
     System.cmd(
       "git",
-      ["-c", "user.name=Test User", "-c", "user.email=test@test.com", "commit", "--allow-empty", "-m", message],
+      [
+        "-c",
+        "user.name=Test User",
+        "-c",
+        "user.email=test@test.com",
+        "commit",
+        "--allow-empty",
+        "-m",
+        message
+      ],
       cd: tmp_dir
     )
   end
@@ -191,7 +209,7 @@ defmodule Git.BranchesTest do
       commit(tmp_dir, "newer commit")
 
       assert {:ok, entries} = Git.Branches.recent(config: config)
-      assert length(entries) > 0
+      assert entries != []
 
       names = Enum.map(entries, & &1.name)
       # newer should appear before older since it has the most recent commit
