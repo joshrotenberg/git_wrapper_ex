@@ -24,14 +24,6 @@ defmodule Git.MixProject do
 
   defp deps do
     [
-      {:jason, "~> 1.4"},
-      # Workshop + Claude backend (path deps for development)
-      {:agent_workshop, path: "../agent_workshop"},
-      {:claude_wrapper, path: "../claude_wrapper_ex", override: true},
-      # MCP server deps
-      {:anubis_mcp, "~> 1.0"},
-      {:bandit, "~> 1.0"},
-      {:plug, "~> 1.16"},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false}
     ]
   end
@@ -49,34 +41,66 @@ defmodule Git.MixProject do
       source_url: "https://github.com/joshrotenberg/git_wrapper_ex",
       extras: ["README.md"],
       groups_for_modules: [
+        "Higher-Level": [
+          Git.Repo,
+          Git.History,
+          Git.Hooks,
+          Git.Branches
+        ],
         "Data Structures": [
+          Git.BisectResult,
+          Git.BlameEntry,
           Git.Branch,
           Git.Checkout,
+          Git.CherryPickResult,
           Git.Commit,
           Git.CommitResult,
           Git.Diff,
           Git.DiffFile,
           Git.MergeResult,
+          Git.PullResult,
+          Git.RebaseResult,
+          Git.ReflogEntry,
           Git.Remote,
+          Git.RevertResult,
+          Git.ShowResult,
           Git.StashEntry,
           Git.Status,
-          Git.Tag
+          Git.Tag,
+          Git.Worktree
         ],
         Commands: [
           Git.Commands.Add,
+          Git.Commands.Bisect,
+          Git.Commands.Blame,
           Git.Commands.Branch,
           Git.Commands.Checkout,
+          Git.Commands.CherryPick,
+          Git.Commands.Clean,
           Git.Commands.Clone,
           Git.Commands.Commit,
           Git.Commands.Diff,
+          Git.Commands.Fetch,
+          Git.Commands.GitConfig,
           Git.Commands.Init,
           Git.Commands.Log,
+          Git.Commands.LsFiles,
           Git.Commands.Merge,
+          Git.Commands.Mv,
+          Git.Commands.Pull,
+          Git.Commands.Push,
+          Git.Commands.Rebase,
+          Git.Commands.Reflog,
           Git.Commands.Remote,
           Git.Commands.Reset,
+          Git.Commands.RevParse,
+          Git.Commands.Revert,
+          Git.Commands.Rm,
+          Git.Commands.Show,
           Git.Commands.Stash,
           Git.Commands.Status,
-          Git.Commands.Tag
+          Git.Commands.Tag,
+          Git.Commands.Worktree
         ],
         Internals: [
           Git.Command,
