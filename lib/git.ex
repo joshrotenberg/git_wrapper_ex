@@ -1703,4 +1703,73 @@ defmodule Git do
     command = struct!(Git.Commands.ShowRef, rest)
     Git.Command.run(Git.Commands.ShowRef, command, config)
   end
+
+  @doc """
+  Runs `git switch` to change branches.
+
+  `git switch` is the modern (Git 2.23+) replacement for the branch-switching
+  role of `git checkout`. It is more focused and prevents accidental file
+  operations.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:branch` - branch name to switch to
+    * `:create` - create a new branch and switch to it (`-c`)
+    * `:force_create` - create or reset a branch and switch to it (`-C`)
+    * `:detach` - switch to a commit in detached HEAD state (`--detach`)
+    * `:force` - force switch even with uncommitted changes (`--force`)
+    * `:discard_changes` - discard local changes (`--discard-changes`)
+    * `:merge` - merge local changes into new branch (`--merge`)
+    * `:orphan` - create a new orphan branch (`--orphan`)
+    * `:guess` - enable/disable branch name guessing from remotes (`--guess`/`--no-guess`)
+    * `:track` - set upstream tracking branch (`--track`)
+
+  ## Examples
+
+      Git.switch(branch: "main")
+      Git.switch(branch: "feat/new", create: true)
+      Git.switch(branch: "v1.0.0", detach: true)
+
+  """
+  @spec switch(keyword()) ::
+          {:ok, Git.Checkout.t()} | {:ok, :done} | {:error, term()}
+  def switch(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.Switch, rest)
+    Git.Command.run(Git.Commands.Switch, command, config)
+  end
+
+  @doc """
+  Runs `git restore` to restore working tree files.
+
+  `git restore` is the modern (Git 2.23+) replacement for the file-restoration
+  role of `git checkout`. It provides explicit control over restoring from the
+  index (staged) vs a source commit.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:files` - list of file paths to restore
+    * `:staged` - restore staged files (unstage, `--staged`)
+    * `:worktree` - restore working tree files (`--worktree`)
+    * `:source` - restore from a specific commit/ref (`--source`)
+    * `:ours` - use our version during conflict (`--ours`)
+    * `:theirs` - use their version during conflict (`--theirs`)
+    * `:patch` - interactively select hunks (`--patch`)
+
+  ## Examples
+
+      Git.restore(files: ["README.md"])
+      Git.restore(files: ["lib/foo.ex"], staged: true)
+      Git.restore(files: ["lib/foo.ex"], source: "HEAD~1")
+      Git.restore(files: ["lib/foo.ex"], staged: true, worktree: true)
+
+  """
+  @spec restore(keyword()) :: {:ok, :done} | {:error, term()}
+  def restore(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.Restore, rest)
+    Git.Command.run(Git.Commands.Restore, command, config)
+  end
 end

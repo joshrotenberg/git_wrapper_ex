@@ -43,6 +43,9 @@ defmodule Git.Checkout do
       String.contains?(output, "Switched to branch") ->
         %__MODULE__{branch: extract_branch(output), created: false}
 
+      String.contains?(output, "Switched to and reset branch") ->
+        %__MODULE__{branch: extract_branch(output), created: false}
+
       String.contains?(output, "Already on") ->
         %__MODULE__{branch: extract_branch(output), created: false}
 

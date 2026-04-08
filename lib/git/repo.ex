@@ -749,4 +749,25 @@ defmodule Git.Repo do
   def show_ref(%__MODULE__{} = repo, opts \\ []) do
     Git.show_ref(Keyword.put(opts, :config, repo.config))
   end
+
+  @doc """
+  Runs `git switch` on the repository.
+
+  See `Git.switch/1` for available options.
+  """
+  @spec switch(t(), keyword()) ::
+          {:ok, Git.Checkout.t()} | {:ok, :done} | {:error, term()}
+  def switch(%__MODULE__{} = repo, opts \\ []) do
+    Git.switch(Keyword.put(opts, :config, repo.config))
+  end
+
+  @doc """
+  Runs `git restore` on the repository.
+
+  See `Git.restore/1` for available options.
+  """
+  @spec restore(t(), keyword()) :: {:ok, :done} | {:error, term()}
+  def restore(%__MODULE__{} = repo, opts \\ []) do
+    Git.restore(Keyword.put(opts, :config, repo.config))
+  end
 end
