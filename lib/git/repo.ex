@@ -810,4 +810,44 @@ defmodule Git.Repo do
   def maintenance(%__MODULE__{} = repo, opts \\ []) do
     Git.maintenance(Keyword.put(opts, :config, repo.config))
   end
+
+  @doc """
+  Runs `git for-each-ref` on the repository.
+
+  See `Git.for_each_ref/1` for available options.
+  """
+  @spec for_each_ref(t(), keyword()) :: {:ok, String.t()} | {:error, term()}
+  def for_each_ref(%__MODULE__{} = repo, opts \\ []) do
+    Git.for_each_ref(Keyword.put(opts, :config, repo.config))
+  end
+
+  @doc """
+  Runs `git hash-object` on the repository.
+
+  See `Git.hash_object/1` for available options.
+  """
+  @spec hash_object(t(), keyword()) :: {:ok, String.t()} | {:error, term()}
+  def hash_object(%__MODULE__{} = repo, opts \\ []) do
+    Git.hash_object(Keyword.put(opts, :config, repo.config))
+  end
+
+  @doc """
+  Runs `git symbolic-ref` on the repository.
+
+  See `Git.symbolic_ref/1` for available options.
+  """
+  @spec symbolic_ref(t(), keyword()) :: {:ok, String.t() | :done} | {:error, term()}
+  def symbolic_ref(%__MODULE__{} = repo, opts \\ []) do
+    Git.symbolic_ref(Keyword.put(opts, :config, repo.config))
+  end
+
+  @doc """
+  Runs `git update-ref` on the repository.
+
+  See `Git.update_ref/1` for available options.
+  """
+  @spec update_ref(t(), keyword()) :: {:ok, :done} | {:error, term()}
+  def update_ref(%__MODULE__{} = repo, opts \\ []) do
+    Git.update_ref(Keyword.put(opts, :config, repo.config))
+  end
 end
