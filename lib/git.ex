@@ -1834,4 +1834,73 @@ defmodule Git do
     command = struct!(Git.Commands.Am, rest)
     Git.Command.run(Git.Commands.Am, command, config)
   end
+
+  @doc """
+  Runs `git interpret-trailers` to add or parse trailers in commit messages.
+
+  Trailers are key-value metadata lines at the end of commit messages, such
+  as "Signed-off-by:" or "Co-authored-by:".
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:file` - path to a file containing the commit message
+    * `:parse` - only output the trailers (`--only-trailers`)
+    * `:trailers` - list of trailers to add, each as `"Key: Value"` (`--trailer`)
+    * `:in_place` - edit the file in place (`--in-place`)
+    * `:trim_empty` - trim empty trailers (`--trim-empty`)
+    * `:where` - where to place new trailers: `"after"`, `"before"`, `"end"`, `"start"` (`--where`)
+    * `:if_exists` - action if trailer exists: `"addIfDifferentNeighbor"`, `"addIfDifferent"`, `"add"`, `"replace"`, `"doNothing"` (`--if-exists`)
+    * `:if_missing` - action if trailer missing: `"add"`, `"doNothing"` (`--if-missing`)
+    * `:unfold` - unfold multi-line trailers (`--unfold`)
+    * `:no_divider` - do not treat `---` as divider (`--no-divider`)
+
+  ## Examples
+
+      Git.interpret_trailers(file: "msg.txt", trailers: ["Signed-off-by: Name <email>"])
+      Git.interpret_trailers(file: "msg.txt", parse: true)
+      Git.interpret_trailers(file: "msg.txt", trailers: ["Acked-by: Name"], in_place: true)
+
+  """
+  @spec interpret_trailers(keyword()) :: {:ok, String.t()} | {:error, term()}
+  def interpret_trailers(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.InterpretTrailers, rest)
+    Git.Command.run(Git.Commands.InterpretTrailers, command, config)
+  end
+
+  @doc """
+  Runs `git maintenance` to manage repository maintenance tasks.
+
+  Supports running, starting, stopping, registering, and unregistering
+  maintenance tasks such as garbage collection and commit-graph updates.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:run` - run maintenance tasks (`run` subcommand)
+    * `:start` - start background maintenance (`start` subcommand)
+    * `:stop` - stop background maintenance (`stop` subcommand)
+    * `:register_` - register repo for maintenance (`register` subcommand)
+    * `:unregister` - unregister repo from maintenance (`unregister` subcommand)
+    * `:task` - specific task to run (`--task`)
+    * `:auto` - only run if needed (`--auto`)
+    * `:quiet` - suppress output (`--quiet`)
+    * `:schedule` - maintenance schedule: `"hourly"`, `"daily"`, `"weekly"` (`--schedule`)
+
+  ## Examples
+
+      Git.maintenance(run: true)
+      Git.maintenance(run: true, task: "gc")
+      Git.maintenance(run: true, auto: true)
+      Git.maintenance(start: true)
+      Git.maintenance(stop: true)
+
+  """
+  @spec maintenance(keyword()) :: {:ok, :done} | {:error, term()}
+  def maintenance(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.Maintenance, rest)
+    Git.Command.run(Git.Commands.Maintenance, command, config)
+  end
 end
