@@ -1772,4 +1772,66 @@ defmodule Git do
     command = struct!(Git.Commands.Restore, rest)
     Git.Command.run(Git.Commands.Restore, command, config)
   end
+
+  @doc """
+  Runs `git apply` to apply a patch to files and/or the index.
+
+  The function is named `apply_patch` to avoid conflicting with `Kernel.apply/2`.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:patch` - path to the patch file (required)
+    * `:check` - check if patch applies cleanly without applying (`--check`)
+    * `:stat` - show diffstat (`--stat`)
+    * `:summary` - show summary (`--summary`)
+    * `:cached` - apply to index only (`--cached`)
+    * `:index` - apply to index and working tree (`--index`)
+    * `:reverse` - apply in reverse (`--reverse`)
+    * `:three_way` - attempt 3-way merge (`--3way`)
+    * `:verbose` - verbose output (`--verbose`)
+
+  ## Examples
+
+      Git.apply_patch(patch: "fix.patch")
+      Git.apply_patch(patch: "fix.patch", check: true)
+      Git.apply_patch(patch: "fix.patch", stat: true)
+
+  """
+  @spec apply_patch(keyword()) :: {:ok, :done} | {:ok, String.t()} | {:error, term()}
+  def apply_patch(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.Apply, rest)
+    Git.Command.run(Git.Commands.Apply, command, config)
+  end
+
+  @doc """
+  Runs `git am` to apply patches from mailbox-formatted files.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:patches` - list of paths to mailbox patch files
+    * `:directory` - path to directory of patches
+    * `:three_way` - 3-way merge on conflict (`--3way`)
+    * `:keep` - keep subject prefix (`--keep`)
+    * `:signoff` - add Signed-off-by line (`--signoff`)
+    * `:abort` - abort current am session (`--abort`)
+    * `:continue_` - continue after resolving conflict (`--continue`)
+    * `:skip` - skip current patch (`--skip`)
+    * `:quiet` - quiet output (`--quiet`)
+
+  ## Examples
+
+      Git.am(patches: ["0001-fix.patch"])
+      Git.am(patches: ["0001-fix.patch"], three_way: true)
+      Git.am(abort: true)
+
+  """
+  @spec am(keyword()) :: {:ok, :done} | {:error, term()}
+  def am(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.Am, rest)
+    Git.Command.run(Git.Commands.Am, command, config)
+  end
 end
