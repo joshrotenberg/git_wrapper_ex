@@ -770,4 +770,24 @@ defmodule Git.Repo do
   def restore(%__MODULE__{} = repo, opts \\ []) do
     Git.restore(Keyword.put(opts, :config, repo.config))
   end
+
+  @doc """
+  Runs `git apply` on the repository.
+
+  See `Git.apply_patch/1` for available options.
+  """
+  @spec apply_patch(t(), keyword()) :: {:ok, :done} | {:ok, String.t()} | {:error, term()}
+  def apply_patch(%__MODULE__{} = repo, opts \\ []) do
+    Git.apply_patch(Keyword.put(opts, :config, repo.config))
+  end
+
+  @doc """
+  Runs `git am` on the repository.
+
+  See `Git.am/1` for available options.
+  """
+  @spec am(t(), keyword()) :: {:ok, :done} | {:error, term()}
+  def am(%__MODULE__{} = repo, opts \\ []) do
+    Git.am(Keyword.put(opts, :config, repo.config))
+  end
 end
