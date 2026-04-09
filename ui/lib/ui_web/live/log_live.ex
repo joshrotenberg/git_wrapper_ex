@@ -81,7 +81,7 @@ defmodule GitUIWeb.LogLive do
               <td class="px-4 py-2 truncate max-w-md">{commit.subject}</td>
               <td class="px-4 py-2 text-zinc-600">{commit.author_name}</td>
               <td class="px-4 py-2 text-zinc-400 whitespace-nowrap">
-                {commit.author_date_relative}
+                {commit.date}
               </td>
             </tr>
           </tbody>

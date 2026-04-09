@@ -114,7 +114,7 @@ defmodule GitUIWeb.DashboardLive do
             <div :for={commit <- @recent_commits} class="flex gap-3 text-sm">
               <span class="font-mono text-blue-600 shrink-0">{commit.abbreviated_hash}</span>
               <span class="truncate">{commit.subject}</span>
-              <span class="text-zinc-400 shrink-0 ml-auto">{commit.author_date_relative}</span>
+              <span class="text-zinc-400 shrink-0 ml-auto">{commit.date}</span>
             </div>
           </div>
         </div>
