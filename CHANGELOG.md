@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.4.0](https://github.com/joshrotenberg/git_wrapper_ex/compare/v0.3.0...v0.4.0) (2026-04-09)
+
+
+### Features
+
+* add apply and am commands (patch workflow) ([#72](https://github.com/joshrotenberg/git_wrapper_ex/issues/72)) ([85830bf](https://github.com/joshrotenberg/git_wrapper_ex/commit/85830bf885199f98b4070bc80fa8e54b1bc0b4f4))
+* add higher-level modules (Changes, Tags, Remotes, Stashes, Patch, Conflicts) ([#75](https://github.com/joshrotenberg/git_wrapper_ex/issues/75)) ([f8d5242](https://github.com/joshrotenberg/git_wrapper_ex/commit/f8d52427b14d1d1608327eeefd0847f76070e42a))
+* add interpret-trailers and maintenance commands ([#74](https://github.com/joshrotenberg/git_wrapper_ex/issues/74)) ([d03079e](https://github.com/joshrotenberg/git_wrapper_ex/commit/d03079eb5e32a7c458dd8125fa78d0c795d4ae2d))
+* add plumbing commands (for-each-ref, hash-object, symbolic-ref, update-ref) ([#73](https://github.com/joshrotenberg/git_wrapper_ex/issues/73)) ([415cd6f](https://github.com/joshrotenberg/git_wrapper_ex/commit/415cd6fb3994ca0f35363cf37c6ea38f8531d6f8))
+* add switch and restore commands (modern checkout replacements) ([#70](https://github.com/joshrotenberg/git_wrapper_ex/issues/70)) ([a86d462](https://github.com/joshrotenberg/git_wrapper_ex/commit/a86d4624c8555bac9b6497deb22d45684a3f5dc9)), closes [#60](https://github.com/joshrotenberg/git_wrapper_ex/issues/60)
+
 ## [0.3.0](https://github.com/joshrotenberg/git_wrapper_ex/compare/v0.2.0...v0.3.0) (2026-04-05)
 
 
