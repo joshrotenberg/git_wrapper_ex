@@ -1903,4 +1903,121 @@ defmodule Git do
     command = struct!(Git.Commands.Maintenance, rest)
     Git.Command.run(Git.Commands.Maintenance, command, config)
   end
+
+  @doc """
+  Runs `git for-each-ref` to iterate over refs.
+
+  Iterates over all refs matching the given pattern(s) and formats them
+  according to the given format string.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:format` - output format string (`--format`)
+    * `:sort` - sort key or list of keys (`--sort`)
+    * `:count` - limit number of results (`--count`)
+    * `:pattern` - ref pattern(s) to match (positional args)
+    * `:contains` - only refs containing commit (`--contains`)
+    * `:merged` - only refs merged into ref (`--merged`)
+    * `:no_merged` - only refs not merged into ref (`--no-merged`)
+    * `:points_at` - only refs pointing at object (`--points-at`)
+
+  ## Examples
+
+      Git.for_each_ref(pattern: "refs/heads/", format: "%(refname:short)")
+      Git.for_each_ref(sort: "-creatordate", count: 5)
+
+  """
+  @spec for_each_ref(keyword()) :: {:ok, String.t()} | {:error, term()}
+  def for_each_ref(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.ForEachRef, rest)
+    Git.Command.run(Git.Commands.ForEachRef, command, config)
+  end
+
+  @doc """
+  Runs `git hash-object` to compute the object ID for a file.
+
+  Computes the object ID value for a file and optionally writes it into
+  the object database. Only file-based hashing is supported.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:file` - path to the file to hash
+    * `:write` - write the object into the database (`-w`)
+    * `:type` - object type (`-t`, default "blob")
+    * `:literally` - allow hashing malformed objects (`--literally`)
+
+  ## Examples
+
+      Git.hash_object(file: "README.md")
+      Git.hash_object(file: "README.md", write: true)
+
+  """
+  @spec hash_object(keyword()) :: {:ok, String.t()} | {:error, term()}
+  def hash_object(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.HashObject, rest)
+    Git.Command.run(Git.Commands.HashObject, command, config)
+  end
+
+  @doc """
+  Runs `git symbolic-ref` to read, create, or delete symbolic refs.
+
+  A symbolic ref is a ref that points to another ref (e.g., HEAD
+  typically points to a branch ref).
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:ref` - the symbolic ref to read/write (e.g., "HEAD")
+    * `:target` - if set, writes the symbolic ref to point to this target
+    * `:short` - shorten the ref name (`--short`)
+    * `:delete` - delete the symbolic ref (`--delete`)
+    * `:quiet` - suppress error messages (`--quiet`)
+
+  ## Examples
+
+      Git.symbolic_ref(ref: "HEAD")
+      Git.symbolic_ref(ref: "HEAD", short: true)
+      Git.symbolic_ref(ref: "HEAD", target: "refs/heads/main")
+
+  """
+  @spec symbolic_ref(keyword()) :: {:ok, String.t() | :done} | {:error, term()}
+  def symbolic_ref(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.SymbolicRef, rest)
+    Git.Command.run(Git.Commands.SymbolicRef, command, config)
+  end
+
+  @doc """
+  Runs `git update-ref` to update the object name stored in a ref.
+
+  Supports conditional updates (compare-and-swap), reflog messages,
+  and deletion of refs.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:ref` - the ref to update
+    * `:new_value` - new value for the ref
+    * `:old_value` - expected current value (for CAS)
+    * `:delete` - delete the ref (`-d`)
+    * `:create_reflog` - create a reflog entry (`--create-reflog`)
+    * `:message` - reflog message (`-m`)
+    * `:no_deref` - don't dereference symbolic refs (`--no-deref`)
+
+  ## Examples
+
+      Git.update_ref(ref: "refs/heads/main", new_value: "abc123")
+      Git.update_ref(ref: "refs/heads/old", delete: true)
+
+  """
+  @spec update_ref(keyword()) :: {:ok, :done} | {:error, term()}
+  def update_ref(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.UpdateRef, rest)
+    Git.Command.run(Git.Commands.UpdateRef, command, config)
+  end
 end
