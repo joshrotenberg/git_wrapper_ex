@@ -790,4 +790,24 @@ defmodule Git.Repo do
   def am(%__MODULE__{} = repo, opts \\ []) do
     Git.am(Keyword.put(opts, :config, repo.config))
   end
+
+  @doc """
+  Runs `git interpret-trailers` on the repository.
+
+  See `Git.interpret_trailers/1` for available options.
+  """
+  @spec interpret_trailers(t(), keyword()) :: {:ok, String.t()} | {:error, term()}
+  def interpret_trailers(%__MODULE__{} = repo, opts \\ []) do
+    Git.interpret_trailers(Keyword.put(opts, :config, repo.config))
+  end
+
+  @doc """
+  Runs `git maintenance` on the repository.
+
+  See `Git.maintenance/1` for available options.
+  """
+  @spec maintenance(t(), keyword()) :: {:ok, :done} | {:error, term()}
+  def maintenance(%__MODULE__{} = repo, opts \\ []) do
+    Git.maintenance(Keyword.put(opts, :config, repo.config))
+  end
 end
