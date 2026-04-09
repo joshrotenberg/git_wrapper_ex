@@ -15,7 +15,7 @@ Add `git` to your dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:git, "~> 0.1.0"}
+    {:git, "~> 0.4.0"}
   ]
 end
 ```
@@ -59,7 +59,9 @@ config = Git.Config.new(
 
 ## Commands
 
-32 git commands with full option support and parsed output.
+64 git commands with full option support and parsed output.
+
+### Core (snapshotting, branching, sharing)
 
 | Function | git command | Returns |
 |---|---|---|
@@ -69,6 +71,8 @@ config = Git.Config.new(
 | `add/1` | `git add` | `:done` |
 | `branch/1` | `git branch` | `[Git.Branch.t()]` or `:done` |
 | `checkout/1` | `git checkout` | `Git.Checkout.t()` or `:done` |
+| `switch/1` | `git switch` | `Git.Checkout.t()` or `:done` |
+| `restore/1` | `git restore` | `:done` |
 | `diff/1` | `git diff` | `Git.Diff.t()` |
 | `merge/2` | `git merge` | `Git.MergeResult.t()` or `:done` |
 | `remote/1` | `git remote` | `[Git.Remote.t()]` or `:done` |
@@ -82,19 +86,69 @@ config = Git.Config.new(
 | `fetch/1` | `git fetch` | `:done` |
 | `rebase/1` | `git rebase` | `Git.RebaseResult.t()` or `:done` |
 | `cherry_pick/1` | `git cherry-pick` | `Git.CherryPickResult.t()` or `:done` |
-| `show/1` | `git show` | `Git.ShowResult.t()` |
-| `rev_parse/1` | `git rev-parse` | `String.t()` |
+| `revert/1` | `git revert` | `Git.RevertResult.t()` or `:done` |
+| `submodule/1` | `git submodule` | varies |
+| `notes/1` | `git notes` | varies |
 | `clean/1` | `git clean` | `[String.t()]` |
-| `blame/2` | `git blame` | `[Git.BlameEntry.t()]` |
 | `mv/3` | `git mv` | `:done` |
 | `rm/1` | `git rm` | `:done` |
-| `revert/1` | `git revert` | `Git.RevertResult.t()` or `:done` |
-| `worktree/1` | `git worktree` | `[Git.Worktree.t()]` or `:done` |
-| `git_config/1` | `git config` | `String.t()` or `[{k, v}]` or `:done` |
-| `ls_files/1` | `git ls-files` | `[String.t()]` |
-| `reflog/1` | `git reflog` | `[Git.ReflogEntry.t()]` |
-| `bisect/1` | `git bisect` | `Git.BisectResult.t()` or `:done` |
+
+### Inspection and comparison
+
+| Function | git command | Returns |
+|---|---|---|
+| `show/1` | `git show` | `Git.ShowResult.t()` |
+| `rev_parse/1` | `git rev-parse` | `String.t()` |
+| `blame/2` | `git blame` | `[Git.BlameEntry.t()]` |
 | `grep/2` | `git grep` | `[Git.GrepResult.t()]` |
+| `describe/1` | `git describe` | `String.t()` |
+| `shortlog/1` | `git shortlog` | `[Git.ShortlogEntry.t()]` |
+| `range_diff/1` | `git range-diff` | `String.t()` |
+| `ls_files/1` | `git ls-files` | `[String.t()]` |
+| `ls_remote/1` | `git ls-remote` | `[Git.LsRemoteEntry.t()]` |
+| `ls_tree/1` | `git ls-tree` | `[Git.TreeEntry.t()]` |
+
+### Patching and email
+
+| Function | git command | Returns |
+|---|---|---|
+| `apply_patch/1` | `git apply` | `:done` or `String.t()` |
+| `am/1` | `git am` | `:done` |
+| `format_patch/1` | `git format-patch` | `[String.t()]` or `String.t()` |
+| `cherry/1` | `git cherry` | `[Git.CherryEntry.t()]` |
+| `interpret_trailers/1` | `git interpret-trailers` | `String.t()` |
+
+### Administration and maintenance
+
+| Function | git command | Returns |
+|---|---|---|
+| `gc/1` | `git gc` | `:done` |
+| `fsck/1` | `git fsck` | `[map()]` |
+| `reflog/1` | `git reflog` | `[Git.ReflogEntry.t()]` |
+| `archive/1` | `git archive` | `:done` |
+| `bundle/1` | `git bundle` | varies |
+| `maintenance/1` | `git maintenance` | `:done` |
+| `git_config/1` | `git config` | `String.t()` or `[{k, v}]` or `:done` |
+| `bisect/1` | `git bisect` | `Git.BisectResult.t()` or `:done` |
+| `worktree/1` | `git worktree` | `[Git.Worktree.t()]` or `:done` |
+| `rerere/1` | `git rerere` | varies |
+| `sparse_checkout/1` | `git sparse-checkout` | varies |
+| `verify_commit/2` | `git verify-commit` | `map()` |
+| `verify_tag/2` | `git verify-tag` | `map()` |
+| `check_ignore/1` | `git check-ignore` | `[String.t()]` or `[map()]` |
+
+### Plumbing
+
+| Function | git command | Returns |
+|---|---|---|
+| `cat_file/2` | `git cat-file` | varies |
+| `for_each_ref/1` | `git for-each-ref` | `String.t()` |
+| `hash_object/1` | `git hash-object` | `String.t()` |
+| `symbolic_ref/1` | `git symbolic-ref` | `String.t()` or `:done` |
+| `update_ref/1` | `git update-ref` | `:done` |
+| `rev_list/1` | `git rev-list` | `[String.t()]` or `integer()` |
+| `merge_base/1` | `git merge-base` | `String.t()` or `boolean()` |
+| `show_ref/1` | `git show-ref` | varies |
 
 All functions return `{:ok, result}` on success or `{:error, {stdout, exit_code}}` on failure.
 
@@ -212,6 +266,66 @@ Branch management:
 {:ok, deleted} = Git.Branches.cleanup_merged(exclude: ["main", "develop"], config: config)
 {:ok, %{ahead: 3, behind: 0}} = Git.Branches.divergence("feat/x", "main", config: config)
 {:ok, recent} = Git.Branches.recent(count: 5, config: config)
+```
+
+### Git.Tags
+
+Tag management:
+
+```elixir
+{:ok, :done} = Git.Tags.create("v1.0.0", message: "Release 1.0.0", config: config)
+{:ok, tags} = Git.Tags.list(config: config)
+{:ok, "v1.0.0"} = Git.Tags.latest(config: config)
+{:ok, sorted} = Git.Tags.sorted(config: config)  # version-sorted
+{:ok, true} = Git.Tags.exists?("v1.0.0", config: config)
+{:ok, :done} = Git.Tags.delete("v0.1.0", config: config)
+```
+
+### Git.Remotes
+
+Remote management:
+
+```elixir
+{:ok, remotes} = Git.Remotes.list_detailed(config: config)
+{:ok, :done} = Git.Remotes.add("upstream", "https://github.com/upstream/repo.git", config: config)
+{:ok, :done} = Git.Remotes.set_url("origin", "git@github.com:me/repo.git", config: config)
+{:ok, :done} = Git.Remotes.prune("origin", config: config)
+{:ok, :done} = Git.Remotes.remove("upstream", config: config)
+```
+
+### Git.Stashes
+
+Stash management:
+
+```elixir
+{:ok, _} = Git.Stashes.save("work in progress", config: config)
+{:ok, stashes} = Git.Stashes.list(config: config)
+{:ok, _} = Git.Stashes.apply(config: config)
+{:ok, _} = Git.Stashes.pop(config: config)
+{:ok, :done} = Git.Stashes.drop(config: config)
+{:ok, :done} = Git.Stashes.clear(config: config)
+```
+
+### Git.Patch
+
+Patch creation and application:
+
+```elixir
+{:ok, files} = Git.Patch.create("HEAD~3", output_directory: "/tmp/patches", config: config)
+{:ok, :done} = Git.Patch.check("/tmp/patches/0001-fix.patch", config: config)
+{:ok, :done} = Git.Patch.apply("/tmp/patches/0001-fix.patch", config: config)
+{:ok, :done} = Git.Patch.apply_mailbox(["0001-fix.patch", "0002-feat.patch"], config: config)
+```
+
+### Git.Conflicts
+
+Merge conflict helpers:
+
+```elixir
+{:ok, false} = Git.Conflicts.detect(config: config)
+{:ok, files} = Git.Conflicts.files(config: config)
+{:ok, true} = Git.Conflicts.resolved?(config: config)
+{:ok, :done} = Git.Conflicts.abort_merge(config: config)
 ```
 
 ### Git.Hooks
