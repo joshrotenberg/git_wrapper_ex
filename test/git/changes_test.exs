@@ -197,4 +197,85 @@ defmodule Git.ChangesTest do
       assert length(summary.files) == 2
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # staged/1
+  # ---------------------------------------------------------------------------
+
+  describe "staged/1" do
+    test "returns diff of staged changes" do
+      {dir, cfg} = setup_repo("changes_staged")
+
+      write_and_commit(dir, cfg, "file.txt", "line1\n", "add file")
+
+      # Modify and stage the file
+      File.write!(Path.join(dir, "file.txt"), "line1\nline2\n")
+      {:ok, :done} = Git.add(files: ["file.txt"], config: cfg)
+
+      assert {:ok, %Git.Diff{} = diff} = Git.Changes.staged(config: cfg)
+      assert diff.total_insertions > 0 or diff.files != []
+    end
+
+    test "returns empty diff when nothing is staged" do
+      {_dir, cfg} = setup_repo("changes_staged_empty")
+
+      assert {:ok, %Git.Diff{} = diff} = Git.Changes.staged(config: cfg)
+      assert diff.files == []
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # unstaged/1
+  # ---------------------------------------------------------------------------
+
+  describe "unstaged/1" do
+    test "returns diff of unstaged changes" do
+      {dir, cfg} = setup_repo("changes_unstaged")
+
+      write_and_commit(dir, cfg, "file.txt", "line1\n", "add file")
+
+      # Modify without staging
+      File.write!(Path.join(dir, "file.txt"), "line1\nline2\n")
+
+      assert {:ok, %Git.Diff{} = diff} = Git.Changes.unstaged(config: cfg)
+      assert diff.total_insertions > 0 or diff.files != []
+    end
+
+    test "returns empty diff when working tree is clean" do
+      {_dir, cfg} = setup_repo("changes_unstaged_empty")
+
+      assert {:ok, %Git.Diff{} = diff} = Git.Changes.unstaged(config: cfg)
+      assert diff.files == []
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # stats/1
+  # ---------------------------------------------------------------------------
+
+  describe "stats/1" do
+    test "returns summary statistics of unstaged changes" do
+      {dir, cfg} = setup_repo("changes_stats")
+
+      write_and_commit(dir, cfg, "file.txt", "line1\n", "add file")
+
+      # Modify without staging
+      File.write!(Path.join(dir, "file.txt"), "line1\nline2\nline3\n")
+
+      assert {:ok, stats} = Git.Changes.stats(config: cfg)
+      assert is_integer(stats.files_changed)
+      assert is_integer(stats.insertions)
+      assert is_integer(stats.deletions)
+      assert stats.files_changed >= 1
+    end
+
+    test "returns zeroes on clean working tree" do
+      {_dir, cfg} = setup_repo("changes_stats_clean")
+
+      assert {:ok, stats} = Git.Changes.stats(config: cfg)
+      assert stats.files_changed == 0
+      assert stats.insertions == 0
+      assert stats.deletions == 0
+    end
+  end
 end
