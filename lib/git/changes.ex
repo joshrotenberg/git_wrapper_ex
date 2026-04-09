@@ -158,6 +158,67 @@ defmodule Git.Changes do
     end
   end
 
+  @doc """
+  Returns only staged changes as a diff.
+
+  Uses `Git.diff(staged: true, stat: true)` to show what is in the index
+  but not yet committed.
+
+  Returns `{:ok, Git.Diff.t()}`.
+  """
+  @spec staged(keyword()) :: {:ok, Git.Diff.t()} | {:error, term()}
+  def staged(opts \\ []) do
+    {config, _rest} = extract_config(opts)
+    Git.diff(staged: true, stat: true, config: config)
+  end
+
+  @doc """
+  Returns only unstaged changes as a diff.
+
+  Uses `Git.diff(stat: true)` to show working tree changes that have not
+  been staged.
+
+  Returns `{:ok, Git.Diff.t()}`.
+  """
+  @spec unstaged(keyword()) :: {:ok, Git.Diff.t()} | {:error, term()}
+  def unstaged(opts \\ []) do
+    {config, _rest} = extract_config(opts)
+    Git.diff(stat: true, config: config)
+  end
+
+  @doc """
+  Returns summary statistics of unstaged working tree changes.
+
+  Uses `Git.diff(stat: true)` and extracts file count, insertions, and
+  deletions into a simple map.
+
+  Returns `{:ok, %{files_changed: n, insertions: n, deletions: n}}`.
+  """
+  @spec stats(keyword()) ::
+          {:ok,
+           %{
+             files_changed: non_neg_integer(),
+             insertions: non_neg_integer(),
+             deletions: non_neg_integer()
+           }}
+          | {:error, term()}
+  def stats(opts \\ []) do
+    {config, _rest} = extract_config(opts)
+
+    case Git.diff(stat: true, config: config) do
+      {:ok, diff} ->
+        {:ok,
+         %{
+           files_changed: length(diff.files),
+           insertions: diff.total_insertions,
+           deletions: diff.total_deletions
+         }}
+
+      error ->
+        error
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # Private helpers
   # ---------------------------------------------------------------------------
