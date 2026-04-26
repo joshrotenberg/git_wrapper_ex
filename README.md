@@ -59,7 +59,7 @@ config = Git.Config.new(
 
 ## Commands
 
-64 git commands with full option support and parsed output.
+65 git commands with full option support and parsed output.
 
 ### Core (snapshotting, branching, sharing)
 
@@ -142,6 +142,7 @@ config = Git.Config.new(
 | Function | git command | Returns |
 |---|---|---|
 | `cat_file/2` | `git cat-file` | varies |
+| `commit_tree/1` | `git commit-tree` | `String.t()` |
 | `for_each_ref/1` | `git for-each-ref` | `String.t()` |
 | `hash_object/1` | `git hash-object` | `String.t()` |
 | `symbolic_ref/1` | `git symbolic-ref` | `String.t()` or `:done` |
