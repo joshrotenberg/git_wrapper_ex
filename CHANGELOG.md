@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/joshrotenberg/git_wrapper_ex/compare/v0.4.0...v0.5.0) (2026-04-26)
+
+
+### Features
+
+* add commit-tree plumbing wrapper ([#77](https://github.com/joshrotenberg/git_wrapper_ex/issues/77)) ([7f3a1ac](https://github.com/joshrotenberg/git_wrapper_ex/commit/7f3a1ac5db9f4cbbedb1b2753b7029cc892c050b))
+
 ## [0.4.0](https://github.com/joshrotenberg/git_wrapper_ex/compare/v0.3.0...v0.4.0) (2026-04-09)
 
 
