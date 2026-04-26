@@ -2020,4 +2020,37 @@ defmodule Git do
     command = struct!(Git.Commands.UpdateRef, rest)
     Git.Command.run(Git.Commands.UpdateRef, command, config)
   end
+
+  @doc """
+  Runs `git commit-tree` to build a commit object directly from a tree.
+
+  Plumbing command. Does not touch the index, working tree, or HEAD.
+  The new commit lives only as a loose object until referenced from a
+  ref via `update_ref/1`. Returns the new commit's SHA on success.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:tree` - the tree SHA to commit (required)
+    * `:parents` - list of parent commit SHAs (default: `[]`)
+    * `:message` - commit message, single string (`-m`)
+    * `:messages` - list of messages, each becomes a separate `-m`
+      (concatenated as paragraphs in the resulting commit message)
+    * `:sign` - `true` for `-S` (use the configured signing key) or a
+      string keyid for `-S<keyid>`
+    * `:no_gpg_sign` - `--no-gpg-sign` (overrides `commit.gpgSign` config)
+
+  ## Examples
+
+      Git.commit_tree(tree: tree_sha, message: "thread: open")
+      Git.commit_tree(tree: tree_sha, parents: [head], message: "next", sign: true)
+      Git.commit_tree(tree: tree_sha, parents: [a, b], message: "merge")
+
+  """
+  @spec commit_tree(keyword()) :: {:ok, String.t()} | {:error, term()}
+  def commit_tree(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.CommitTree, rest)
+    Git.Command.run(Git.Commands.CommitTree, command, config)
+  end
 end
