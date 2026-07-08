@@ -24,6 +24,7 @@ defmodule Git.MixProject do
 
   defp deps do
     [
+      {:forcola, "~> 0.3", optional: true},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
@@ -154,7 +155,10 @@ defmodule Git.MixProject do
         ],
         Internals: [
           Git.Command,
-          Git.Config
+          Git.Config,
+          Git.Runner,
+          Git.Runner.SystemCmd,
+          Git.Runner.Forcola
         ]
       ]
     ]

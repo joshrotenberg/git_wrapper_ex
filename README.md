@@ -6,7 +6,9 @@
 
 A clean Elixir wrapper for the git CLI. Provides a direct, idiomatic mapping
 to git subcommands with fully parsed output structs and higher-level workflow
-abstractions. No NIFs, no ports -- just `System.cmd/3` with structured results.
+abstractions. Runs git through `System.cmd/3` by default, with an optional
+leak-free runner for group-kill on timeout (see
+[Execution and timeouts](#execution-and-timeouts)).
 
 ## Installation
 
@@ -56,6 +58,40 @@ config = Git.Config.new(
 
 {:ok, status} = Git.status(config: config)
 ```
+
+## Execution and timeouts
+
+Every git command runs through a `Git.Runner`. The default,
+`Git.Runner.SystemCmd`, uses `System.cmd/3` and works everywhere with no extra
+dependencies.
+
+`System.cmd/3` implements timeouts by closing the Erlang port, which only
+closes the stdin/stdout pipes and never signals the git OS process. A git
+command that times out, and anything git spawned (ssh transports, credential
+helpers, hooks, sign helpers), can keep running and hold repository locks such
+as `.git/index.lock`.
+
+For leak-free execution, add the optional
+[forcola](https://hex.pm/packages/forcola) dependency and select the forcola
+runner. It runs git in its own process group and kills the whole group
+(SIGTERM then SIGKILL) on timeout or BEAM death, so a `{:error, :timeout}`
+means git is actually gone.
+
+```elixir
+# mix.exs
+{:forcola, "~> 0.3"}
+```
+
+```elixir
+config = Git.Config.new(runner: :forcola)
+{:ok, status} = Git.status(config: config)
+```
+
+forcola is POSIX-only (macOS and Linux) and ships precompiled shim binaries,
+so no Rust toolchain is required on its supported targets. When forcola is not
+installed, `runner: :forcola` falls back to the default `System.cmd/3` runner.
+The `:runner` value may also be any module implementing the `Git.Runner`
+behaviour.
 
 ## Commands
 
