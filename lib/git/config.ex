@@ -30,11 +30,19 @@ defmodule Git.Config do
           working_dir: String.t() | nil,
           env: [{String.t(), String.t()}],
           timeout: pos_integer(),
-          runner: runner()
+          runner: runner(),
+          extra_config: [{String.t(), String.t()}]
         }
 
   @enforce_keys [:binary]
-  defstruct [:binary, :working_dir, env: [], timeout: @default_timeout, runner: @default_runner]
+  defstruct [
+    :binary,
+    :working_dir,
+    env: [],
+    timeout: @default_timeout,
+    runner: @default_runner,
+    extra_config: []
+  ]
 
   @doc """
   Creates a new `Git.Config` struct.
@@ -47,6 +55,9 @@ defmodule Git.Config do
     * `:timeout` - command timeout in milliseconds (default: `#{@default_timeout}`)
     * `:runner` - how commands are executed (default: `#{inspect(@default_runner)}`).
       See the `t:runner/0` type.
+    * `:extra_config` - list of `{key, value}` tuples emitted as `git -c key=value`
+      before every subcommand, to set config per-invocation without mutating repo
+      config (default: `[]`)
 
   ## Examples
 
@@ -64,6 +75,10 @@ defmodule Git.Config do
       iex> config.runner
       :forcola
 
+      iex> config = Git.Config.new(extra_config: [{"merge.conflictStyle", "diff3"}])
+      iex> Git.Config.base_args(config)
+      ["-c", "merge.conflictStyle=diff3"]
+
   """
   @spec new(keyword()) :: t()
   def new(opts \\ []) do
@@ -72,17 +87,23 @@ defmodule Git.Config do
       working_dir: Keyword.get(opts, :working_dir),
       env: Keyword.get(opts, :env, []),
       timeout: Keyword.get(opts, :timeout, @default_timeout),
-      runner: Keyword.get(opts, :runner, @default_runner)
+      runner: Keyword.get(opts, :runner, @default_runner),
+      extra_config: Keyword.get(opts, :extra_config, [])
     }
   end
 
   @doc """
-  Returns the base arguments for all git commands.
+  Returns the base arguments prepended to every git command.
 
-  Git does not require any global flags, so this returns an empty list.
+  Emits a `-c key=value` pair for each entry in the config's `:extra_config`, so
+  a caller can set config per-invocation (for example `merge.conflictStyle` or
+  `commit.gpgsign`) without mutating repo config. Returns `[]` when
+  `:extra_config` is empty.
   """
   @spec base_args(t()) :: [String.t()]
-  def base_args(%__MODULE__{}), do: []
+  def base_args(%__MODULE__{extra_config: extra_config}) do
+    Enum.flat_map(extra_config, fn {key, value} -> ["-c", "#{key}=#{value}"] end)
+  end
 
   @doc """
   Builds the options keyword list for `System.cmd/3`.
