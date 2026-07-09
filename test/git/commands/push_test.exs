@@ -64,6 +64,41 @@ defmodule Git.Commands.PushTest do
       assert Push.args(%Push{prune: true}) == ["push", "--prune"]
     end
 
+    test "adds --follow-tags flag" do
+      assert Push.args(%Push{follow_tags: true}) == ["push", "--follow-tags"]
+    end
+
+    test "adds --signed flag" do
+      assert Push.args(%Push{signed: true}) == ["push", "--signed"]
+    end
+
+    test "adds a single --push-option" do
+      assert Push.args(%Push{push_option: ["ci.skip"]}) ==
+               ["push", "--push-option", "ci.skip"]
+    end
+
+    test "adds multiple --push-option entries in order" do
+      assert Push.args(%Push{push_option: ["ci.skip", "notify=team"]}) ==
+               ["push", "--push-option", "ci.skip", "--push-option", "notify=team"]
+    end
+
+    test "default push_option adds nothing" do
+      assert Push.args(%Push{push_option: []}) == ["push"]
+    end
+
+    test "force_with_lease: true emits --force-with-lease" do
+      assert Push.args(%Push{force_with_lease: true}) == ["push", "--force-with-lease"]
+    end
+
+    test "force_with_lease with a string emits --force-with-lease=<value>" do
+      assert Push.args(%Push{force_with_lease: "main:abc123"}) ==
+               ["push", "--force-with-lease=main:abc123"]
+    end
+
+    test "force_with_lease: false emits nothing" do
+      assert Push.args(%Push{force_with_lease: false}) == ["push"]
+    end
+
     test "combines multiple flags" do
       assert Push.args(%Push{
                force: true,
@@ -199,6 +234,52 @@ defmodule Git.Commands.PushTest do
                  %Push{remote: "origin", tags: true},
                  config
                )
+    end
+
+    test "push with follow_tags and push_option succeeds", %{
+      local_dir: local_dir,
+      remote_dir: remote_dir,
+      config: config
+    } do
+      # The receiving end must advertise push option support for --push-option.
+      System.cmd(
+        "git",
+        ["config", "receive.advertisePushOptions", "true"],
+        cd: remote_dir
+      )
+
+      # Create an annotated tag so --follow-tags has something to push.
+      System.cmd(
+        "git",
+        [
+          "-c",
+          "user.name=Test User",
+          "-c",
+          "user.email=test@test.com",
+          "tag",
+          "-a",
+          "v1.0.0",
+          "-m",
+          "release"
+        ],
+        cd: local_dir
+      )
+
+      assert {:ok, :done} =
+               Git.Command.run(
+                 Push,
+                 %Push{
+                   remote: "origin",
+                   branch: "main",
+                   follow_tags: true,
+                   push_option: ["ci.skip"]
+                 },
+                 config
+               )
+
+      # The annotated tag was pushed via --follow-tags.
+      {tags, 0} = System.cmd("git", ["tag"], cd: remote_dir)
+      assert tags =~ "v1.0.0"
     end
 
     test "push returns error when remote does not exist", %{config: config} do
