@@ -257,9 +257,15 @@ defmodule Git do
     * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
     * `:create` - name of a new tag to create
     * `:message` - annotation message (creates an annotated tag when set with `:create`)
+    * `:file` - read the annotation message from this file (`-F <path>`, annotated);
+      takes precedence over `:message` and never opens an editor
+    * `:force` - replace an existing tag on creation (`-f`, moves the tag)
     * `:delete` - name of a tag to delete
     * `:ref` - commit ref to tag (default: HEAD)
     * `:sort` - sort order for listing (e.g., `"-version:refname"`)
+    * `:contains` - list only tags that contain this commit (`--contains <commit>`)
+    * `:points_at` - list only tags that point at this object (`--points-at <object>`)
+    * `:list_glob` - list only tags matching this glob (`--list <glob>`)
 
   """
   @spec tag(keyword()) ::

@@ -15,16 +15,26 @@ defmodule Git.Commands.Tag do
           create: String.t() | nil,
           delete: String.t() | nil,
           message: String.t() | nil,
+          file: String.t() | nil,
+          force: boolean(),
           ref: String.t() | nil,
-          sort: String.t() | nil
+          sort: String.t() | nil,
+          contains: String.t() | nil,
+          points_at: String.t() | nil,
+          list_glob: String.t() | nil
         }
 
   defstruct list: true,
             create: nil,
             delete: nil,
             message: nil,
+            file: nil,
+            force: false,
             ref: nil,
-            sort: nil
+            sort: nil,
+            contains: nil,
+            points_at: nil,
+            list_glob: nil
 
   # Process dictionary key used to communicate the operation mode from args/1
   # to parse_output/2. Both are called from the same process inside
@@ -35,9 +45,13 @@ defmodule Git.Commands.Tag do
   Returns the argument list for `git tag`.
 
   - If `:create` is set with `:message`, builds `git tag -a <name> -m <msg>` (annotated).
-  - If `:create` is set without `:message`, builds `git tag <name>` (lightweight).
+  - If `:create` is set with `:file`, builds `git tag -a <name> -F <path>` (annotated
+    message read from a file). `:file` takes precedence over `:message`.
+  - If `:create` is set without `:message` or `:file`, builds `git tag <name>` (lightweight).
+  - If `:force` is set on creation, adds `-f` so an existing tag is moved/replaced.
   - If `:delete` is set, builds `git tag -d <name>`.
-  - Otherwise, lists tags with detailed format.
+  - Otherwise, lists tags with detailed format. Listing accepts `:contains`,
+    `:points_at`, `:list_glob`, and `:sort` filters.
 
   Both create and delete accept an optional `:ref` to specify the commit.
 
@@ -52,32 +66,25 @@ defmodule Git.Commands.Tag do
       iex> Git.Commands.Tag.args(%Git.Commands.Tag{create: "v1.0.0", message: "release 1.0"})
       ["tag", "-a", "v1.0.0", "-m", "release 1.0"]
 
+      iex> Git.Commands.Tag.args(%Git.Commands.Tag{create: "v1.0.0", force: true})
+      ["tag", "-f", "v1.0.0"]
+
       iex> Git.Commands.Tag.args(%Git.Commands.Tag{delete: "v1.0.0"})
       ["tag", "-d", "v1.0.0"]
+
+      iex> Git.Commands.Tag.args(%Git.Commands.Tag{contains: "HEAD"})
+      ["tag", "-l", "--contains", "HEAD", "--format=" <> Git.Tag.format_string()]
 
   """
   @spec args(t()) :: [String.t()]
   @impl true
-  def args(%__MODULE__{create: name, message: message, ref: ref})
-      when is_binary(name) and is_binary(message) and is_binary(ref) do
+  def args(%__MODULE__{create: name} = tag) when is_binary(name) do
     Process.put(@mode_key, :mutation)
-    ["tag", "-a", name, "-m", message, ref]
-  end
 
-  def args(%__MODULE__{create: name, message: message})
-      when is_binary(name) and is_binary(message) do
-    Process.put(@mode_key, :mutation)
-    ["tag", "-a", name, "-m", message]
-  end
-
-  def args(%__MODULE__{create: name, ref: ref}) when is_binary(name) and is_binary(ref) do
-    Process.put(@mode_key, :mutation)
-    ["tag", name, ref]
-  end
-
-  def args(%__MODULE__{create: name}) when is_binary(name) do
-    Process.put(@mode_key, :mutation)
-    ["tag", name]
+    ["tag"]
+    |> maybe_add("-f", tag.force)
+    |> add_create(name, tag)
+    |> maybe_add_ref(tag.ref)
   end
 
   def args(%__MODULE__{delete: name}) when is_binary(name) do
@@ -85,15 +92,41 @@ defmodule Git.Commands.Tag do
     ["tag", "-d", name]
   end
 
-  def args(%__MODULE__{sort: sort}) when is_binary(sort) do
+  def args(%__MODULE__{} = tag) do
     Process.put(@mode_key, :list)
-    ["tag", "-l", "--sort=#{sort}", "--format=#{Tag.format_string()}"]
+
+    ["tag", "-l"]
+    |> maybe_add_value("--contains", tag.contains)
+    |> maybe_add_value("--points-at", tag.points_at)
+    |> maybe_add_value("--list", tag.list_glob)
+    |> maybe_add_sort(tag.sort)
+    |> Kernel.++(["--format=#{Tag.format_string()}"])
   end
 
-  def args(%__MODULE__{}) do
-    Process.put(@mode_key, :list)
-    ["tag", "-l", "--format=#{Tag.format_string()}"]
+  # Builds the create-specific args. `:file` takes precedence over `:message`.
+  defp add_create(args, name, %__MODULE__{file: file}) when is_binary(file) do
+    args ++ ["-a", name, "-F", file]
   end
+
+  defp add_create(args, name, %__MODULE__{message: message}) when is_binary(message) do
+    args ++ ["-a", name, "-m", message]
+  end
+
+  defp add_create(args, name, %__MODULE__{}) do
+    args ++ [name]
+  end
+
+  defp maybe_add(args, _flag, false), do: args
+  defp maybe_add(args, flag, true), do: args ++ [flag]
+
+  defp maybe_add_value(args, _flag, nil), do: args
+  defp maybe_add_value(args, flag, value) when is_binary(value), do: args ++ [flag, value]
+
+  defp maybe_add_ref(args, nil), do: args
+  defp maybe_add_ref(args, ref) when is_binary(ref), do: args ++ [ref]
+
+  defp maybe_add_sort(args, nil), do: args
+  defp maybe_add_sort(args, sort) when is_binary(sort), do: args ++ ["--sort=#{sort}"]
 
   @doc """
   Parses the output of `git tag`.
