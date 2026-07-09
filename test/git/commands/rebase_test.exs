@@ -56,6 +56,10 @@ defmodule Git.RebaseTest do
       assert Rebase.args(%Rebase{skip: true}) == ["rebase", "--skip"]
     end
 
+    test "builds args for quit" do
+      assert Rebase.args(%Rebase{quit: true}) == ["rebase", "--quit"]
+    end
+
     test "builds args with upstream" do
       assert Rebase.args(%Rebase{upstream: "main"}) == ["rebase", "main"]
     end
@@ -78,6 +82,57 @@ defmodule Git.RebaseTest do
     test "builds args with force-rebase" do
       assert Rebase.args(%Rebase{upstream: "main", force_rebase: true}) ==
                ["rebase", "--force-rebase", "main"]
+    end
+
+    test "builds args with --exec" do
+      assert Rebase.args(%Rebase{upstream: "main", exec: "make test"}) ==
+               ["rebase", "--exec", "make test", "main"]
+    end
+
+    test "builds args with --update-refs" do
+      assert Rebase.args(%Rebase{upstream: "main", update_refs: true}) ==
+               ["rebase", "--update-refs", "main"]
+    end
+
+    test "builds args with --strategy" do
+      assert Rebase.args(%Rebase{upstream: "main", strategy: "ort"}) ==
+               ["rebase", "--strategy", "ort", "main"]
+    end
+
+    test "builds args with a single --strategy-option" do
+      assert Rebase.args(%Rebase{upstream: "main", strategy_option: ["theirs"]}) ==
+               ["rebase", "--strategy-option", "theirs", "main"]
+    end
+
+    test "builds args with multiple --strategy-option values" do
+      assert Rebase.args(%Rebase{upstream: "main", strategy_option: ["theirs", "renormalize"]}) ==
+               [
+                 "rebase",
+                 "--strategy-option",
+                 "theirs",
+                 "--strategy-option",
+                 "renormalize",
+                 "main"
+               ]
+    end
+
+    test "builds args with --root" do
+      assert Rebase.args(%Rebase{root: true, onto: "main"}) ==
+               ["rebase", "--onto", "main", "--root"]
+    end
+
+    test "builds args with --empty" do
+      assert Rebase.args(%Rebase{upstream: "main", empty: "drop"}) ==
+               ["rebase", "--empty=drop", "main"]
+    end
+
+    test "builds args combining strategy and strategy options" do
+      assert Rebase.args(%Rebase{
+               upstream: "main",
+               strategy: "ort",
+               strategy_option: ["ours"]
+             }) ==
+               ["rebase", "--strategy", "ort", "--strategy-option", "ours", "main"]
     end
   end
 
@@ -164,6 +219,63 @@ defmodule Git.RebaseTest do
 
       result = Git.Command.run(Rebase, %Rebase{upstream: "main"}, config)
       assert {:ok, %RebaseResult{}} = result
+    end
+  end
+
+  describe "rebase with exec" do
+    test "rebases onto main running a command after each commit", %{
+      tmp_dir: tmp_dir,
+      config: config
+    } do
+      # Create a feature branch with its own commit
+      System.cmd("git", ["checkout", "-b", "feature"], cd: tmp_dir)
+      File.write!(Path.join(tmp_dir, "feature.txt"), "feature content\n")
+      System.cmd("git", ["add", "feature.txt"], cd: tmp_dir)
+
+      System.cmd(
+        "git",
+        [
+          "-c",
+          "user.name=Test User",
+          "-c",
+          "user.email=test@test.com",
+          "commit",
+          "-m",
+          "feature commit"
+        ],
+        cd: tmp_dir
+      )
+
+      # Advance main so the branches diverge
+      System.cmd("git", ["checkout", "main"], cd: tmp_dir)
+      File.write!(Path.join(tmp_dir, "main.txt"), "main content\n")
+      System.cmd("git", ["add", "main.txt"], cd: tmp_dir)
+
+      System.cmd(
+        "git",
+        [
+          "-c",
+          "user.name=Test User",
+          "-c",
+          "user.email=test@test.com",
+          "commit",
+          "-m",
+          "main commit"
+        ],
+        cd: tmp_dir
+      )
+
+      System.cmd("git", ["checkout", "feature"], cd: tmp_dir)
+
+      # Rebase feature onto main, running `true` after each replayed commit
+      result = Git.Command.run(Rebase, %Rebase{upstream: "main", exec: "true"}, config)
+
+      assert {:ok, %RebaseResult{}} = result
+
+      # The feature commit should now sit on top of the advanced main
+      {log, 0} = System.cmd("git", ["log", "--oneline"], cd: tmp_dir)
+      assert log =~ "feature commit"
+      assert log =~ "main commit"
     end
   end
 

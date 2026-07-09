@@ -3,13 +3,20 @@ defmodule Git.Commands.Rebase do
   Implements the `Git.Command` behaviour for `git rebase`.
 
   Supports rebasing a branch onto an upstream ref, as well as aborting,
-  continuing, and skipping in-progress rebases.
+  continuing, skipping, and quitting in-progress rebases.
 
   ## Unsupported options
 
   The `--interactive` (`-i`) flag is intentionally not supported because it
   requires an interactive editor session, which cannot be driven by a
   non-interactive CLI wrapper.
+
+  ## Autosquash
+
+  The `:autosquash` and `:no_autosquash` fields are inert during a normal
+  rebase. Git only honors `--autosquash` together with an interactive rebase
+  (`-i`), which this wrapper does not support, so setting these fields has no
+  effect on the produced history.
   """
 
   @behaviour Git.Command
@@ -23,6 +30,7 @@ defmodule Git.Commands.Rebase do
           abort: boolean(),
           continue_rebase: boolean(),
           skip: boolean(),
+          quit: boolean(),
           autostash: boolean(),
           no_autostash: boolean(),
           autosquash: boolean(),
@@ -34,7 +42,13 @@ defmodule Git.Commands.Rebase do
           verbose: boolean(),
           quiet: boolean(),
           stat: boolean(),
-          no_stat: boolean()
+          no_stat: boolean(),
+          exec: String.t() | nil,
+          update_refs: boolean(),
+          strategy: String.t() | nil,
+          strategy_option: [String.t()],
+          root: boolean(),
+          empty: String.t() | nil
         }
 
   defstruct upstream: nil,
@@ -43,6 +57,7 @@ defmodule Git.Commands.Rebase do
             abort: false,
             continue_rebase: false,
             skip: false,
+            quit: false,
             autostash: false,
             no_autostash: false,
             autosquash: false,
@@ -54,7 +69,13 @@ defmodule Git.Commands.Rebase do
             verbose: false,
             quiet: false,
             stat: false,
-            no_stat: false
+            no_stat: false,
+            exec: nil,
+            update_refs: false,
+            strategy: nil,
+            strategy_option: [],
+            root: false,
+            empty: nil
 
   # Process dictionary key used to communicate the operation mode from args/1
   # to parse_output/2. Both are called from the same process inside
@@ -64,7 +85,7 @@ defmodule Git.Commands.Rebase do
   @doc """
   Returns the argument list for `git rebase`.
 
-  When `:abort`, `:continue_rebase`, or `:skip` is `true`, builds the
+  When `:abort`, `:continue_rebase`, `:skip`, or `:quit` is `true`, builds the
   corresponding mutation command. Otherwise builds the full rebase command
   with all applicable flags.
 
@@ -78,6 +99,9 @@ defmodule Git.Commands.Rebase do
 
       iex> Git.Commands.Rebase.args(%Git.Commands.Rebase{skip: true})
       ["rebase", "--skip"]
+
+      iex> Git.Commands.Rebase.args(%Git.Commands.Rebase{quit: true})
+      ["rebase", "--quit"]
 
       iex> Git.Commands.Rebase.args(%Git.Commands.Rebase{upstream: "main"})
       ["rebase", "main"]
@@ -106,6 +130,11 @@ defmodule Git.Commands.Rebase do
     ["rebase", "--skip"]
   end
 
+  def args(%__MODULE__{quit: true}) do
+    Process.put(@mode_key, :mutation)
+    ["rebase", "--quit"]
+  end
+
   def args(%__MODULE__{} = command) do
     Process.put(@mode_key, :rebase)
 
@@ -123,6 +152,12 @@ defmodule Git.Commands.Rebase do
     |> maybe_add(command.quiet, "--quiet")
     |> maybe_add(command.stat, "--stat")
     |> maybe_add(command.no_stat, "--no-stat")
+    |> maybe_add_option(command.exec, "--exec")
+    |> maybe_add(command.update_refs, "--update-refs")
+    |> maybe_add_option(command.strategy, "--strategy")
+    |> maybe_add_strategy_options(command.strategy_option)
+    |> maybe_add(command.root, "--root")
+    |> maybe_add_empty(command.empty)
     |> maybe_add_value(command.upstream)
     |> maybe_add_value(command.branch)
   end
@@ -155,4 +190,13 @@ defmodule Git.Commands.Rebase do
 
   defp maybe_add_option(args, nil, _flag), do: args
   defp maybe_add_option(args, value, flag), do: args ++ [flag, value]
+
+  defp maybe_add_strategy_options(args, []), do: args
+
+  defp maybe_add_strategy_options(args, options) do
+    Enum.reduce(options, args, fn value, acc -> acc ++ ["--strategy-option", value] end)
+  end
+
+  defp maybe_add_empty(args, nil), do: args
+  defp maybe_add_empty(args, mode), do: args ++ ["--empty=#{mode}"]
 end
