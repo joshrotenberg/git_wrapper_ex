@@ -596,6 +596,7 @@ defmodule Git do
     * `:abort` - abort in-progress rebase (`--abort`)
     * `:continue_rebase` - continue after conflict resolution (`--continue`)
     * `:skip` - skip current patch (`--skip`)
+    * `:quit` - abandon the rebase without resetting HEAD (`--quit`)
     * `:autostash` - automatically stash/unstash (`--autostash`)
     * `:autosquash` / `:no_autosquash` - autosquash fixup commits
     * `:keep_empty` / `:no_keep_empty` - keep empty commits
@@ -603,8 +604,17 @@ defmodule Git do
     * `:force_rebase` - force rebase (`--force-rebase`)
     * `:verbose` / `:quiet` - output verbosity
     * `:stat` / `:no_stat` - show diffstat
+    * `:exec` - run a shell command after each commit (`--exec`)
+    * `:update_refs` - update branches that point to rebased commits (`--update-refs`)
+    * `:strategy` - use the given merge strategy (`--strategy`)
+    * `:strategy_option` - list of strategy-specific options, each passed as
+      `--strategy-option <value>`
+    * `:root` - rebase all commits reachable from the branch (`--root`)
+    * `:empty` - how to handle commits that become empty (`--empty=<mode>`)
 
-  Note: `--interactive` is not supported as it requires an editor.
+  Note: `--interactive` is not supported as it requires an editor. Because of
+  that, `:autosquash` and `:no_autosquash` are inert; git only honors
+  `--autosquash` together with an interactive rebase.
 
   ## Examples
 
