@@ -64,7 +64,7 @@ defmodule Git.WorkflowsTest do
   describe "basic development workflow" do
     test "create, add, commit, then modify and commit again" do
       dir = setup_repo("basic_dev")
-      on_exit(fn -> File.rm_rf!(dir) end)
+      on_exit(fn -> Git.TestHelpers.rm_rf(dir) end)
       cfg = config(dir)
 
       # Create a file, add, commit
@@ -100,7 +100,7 @@ defmodule Git.WorkflowsTest do
   describe "branch and merge workflow" do
     test "create feature branch, commit, merge back to main" do
       dir = setup_repo("branch_merge")
-      on_exit(fn -> File.rm_rf!(dir) end)
+      on_exit(fn -> Git.TestHelpers.rm_rf(dir) end)
       cfg = config(dir)
 
       # Create and checkout feature branch
@@ -134,7 +134,7 @@ defmodule Git.WorkflowsTest do
   describe "remote push and clone workflow" do
     test "push to remote, clone elsewhere, verify content" do
       {tmp_dir, local_dir, remote_dir} = setup_remote_repo("push_clone")
-      on_exit(fn -> File.rm_rf!(tmp_dir) end)
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
       cfg = config(local_dir)
 
       # Create file, add, commit, push
@@ -166,7 +166,7 @@ defmodule Git.WorkflowsTest do
   describe "fetch and pull workflow" do
     test "push from second clone, fetch and pull in first" do
       {tmp_dir, local_dir, remote_dir} = setup_remote_repo("fetch_pull")
-      on_exit(fn -> File.rm_rf!(tmp_dir) end)
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
 
       # Clone to a second local dir
       second_dir = Path.join(tmp_dir, "second")
@@ -203,7 +203,7 @@ defmodule Git.WorkflowsTest do
   describe "rebase workflow" do
     test "rebase feature branch onto main for linear history" do
       dir = setup_repo("rebase")
-      on_exit(fn -> File.rm_rf!(dir) end)
+      on_exit(fn -> Git.TestHelpers.rm_rf(dir) end)
       cfg = config(dir)
 
       # Create feature branch and add a commit
@@ -244,7 +244,7 @@ defmodule Git.WorkflowsTest do
   describe "stash workflow" do
     test "stash save and pop round-trip" do
       dir = setup_repo("stash")
-      on_exit(fn -> File.rm_rf!(dir) end)
+      on_exit(fn -> Git.TestHelpers.rm_rf(dir) end)
       cfg = config(dir)
 
       # Create and commit a file so it's tracked
@@ -284,7 +284,7 @@ defmodule Git.WorkflowsTest do
   describe "tag and release workflow" do
     test "conventional commits with tags and changelog" do
       dir = setup_repo("tag_release")
-      on_exit(fn -> File.rm_rf!(dir) end)
+      on_exit(fn -> Git.TestHelpers.rm_rf(dir) end)
       cfg = config(dir)
 
       # First feature commit
@@ -332,7 +332,7 @@ defmodule Git.WorkflowsTest do
   describe "branch management workflow" do
     test "create branches, merge some, clean up merged" do
       dir = setup_repo("branch_mgmt")
-      on_exit(fn -> File.rm_rf!(dir) end)
+      on_exit(fn -> Git.TestHelpers.rm_rf(dir) end)
       cfg = config(dir)
 
       # Create several branches with commits
@@ -382,7 +382,7 @@ defmodule Git.WorkflowsTest do
   describe "Git.Repo pipeline workflow" do
     test "open, add, commit, verify via log" do
       dir = setup_repo("repo_pipeline")
-      on_exit(fn -> File.rm_rf!(dir) end)
+      on_exit(fn -> Git.TestHelpers.rm_rf(dir) end)
 
       # Open the repo
       assert {:ok, repo} = Repo.open(dir)
@@ -402,7 +402,7 @@ defmodule Git.WorkflowsTest do
 
     test "Repo.run pipeline short-circuits on error" do
       dir = setup_repo("repo_pipeline_error")
-      on_exit(fn -> File.rm_rf!(dir) end)
+      on_exit(fn -> Git.TestHelpers.rm_rf(dir) end)
 
       result =
         Repo.open(dir)
@@ -426,7 +426,7 @@ defmodule Git.WorkflowsTest do
   describe "blame and show workflow" do
     test "blame maps lines to correct commits, show displays commit" do
       dir = setup_repo("blame_show")
-      on_exit(fn -> File.rm_rf!(dir) end)
+      on_exit(fn -> Git.TestHelpers.rm_rf(dir) end)
       cfg = config(dir)
 
       # Create file with content, commit
@@ -467,7 +467,7 @@ defmodule Git.WorkflowsTest do
   describe "conflict detection workflow" do
     test "detect merge conflict and abort" do
       dir = setup_repo("conflict")
-      on_exit(fn -> File.rm_rf!(dir) end)
+      on_exit(fn -> Git.TestHelpers.rm_rf(dir) end)
       cfg = config(dir)
 
       # Create a file on main
@@ -506,7 +506,7 @@ defmodule Git.WorkflowsTest do
   describe "hooks lifecycle workflow" do
     test "write, enable, disable, remove a hook" do
       dir = setup_repo("hooks")
-      on_exit(fn -> File.rm_rf!(dir) end)
+      on_exit(fn -> Git.TestHelpers.rm_rf(dir) end)
       cfg = config(dir)
 
       hook_content = """

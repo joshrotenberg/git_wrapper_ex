@@ -21,7 +21,7 @@ defmodule Git.BranchTest do
     System.cmd("git", ["config", "user.name", "Test User"], cd: dir)
     # Create an initial commit so branches are valid
     System.cmd("git", ["commit", "--allow-empty", "-m", "init"], cd: dir)
-    on_exit(fn -> File.rm_rf!(dir) end)
+    on_exit(fn -> Git.TestHelpers.rm_rf(dir) end)
     {Git.Config.new(working_dir: dir), dir}
   end
 

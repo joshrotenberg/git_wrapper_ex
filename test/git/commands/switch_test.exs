@@ -24,7 +24,7 @@ defmodule Git.SwitchTest do
       cd: tmp_dir
     )
 
-    on_exit(fn -> File.rm_rf!(tmp_dir) end)
+    on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
 
     config = Config.new(working_dir: tmp_dir)
 

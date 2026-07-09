@@ -32,7 +32,7 @@ defmodule Git.RepoTest do
   setup do
     dir = tmp_dir()
     init_repo(dir)
-    on_exit(fn -> File.rm_rf!(dir) end)
+    on_exit(fn -> Git.TestHelpers.rm_rf(dir) end)
     %{tmp_dir: dir}
   end
 
@@ -57,7 +57,7 @@ defmodule Git.RepoTest do
     test "returns error for non-repo directory" do
       dir = tmp_dir() <> "_nonrepo"
       File.mkdir_p!(dir)
-      on_exit(fn -> File.rm_rf!(dir) end)
+      on_exit(fn -> Git.TestHelpers.rm_rf(dir) end)
 
       assert {:error, _} = Repo.open(dir)
     end
@@ -84,7 +84,7 @@ defmodule Git.RepoTest do
   describe "init/1" do
     test "initializes a new repository" do
       dir = tmp_dir() <> "_init"
-      on_exit(fn -> File.rm_rf!(dir) end)
+      on_exit(fn -> Git.TestHelpers.rm_rf(dir) end)
 
       assert {:ok, %Repo{} = repo} = Repo.init(dir)
       assert repo.path == dir
@@ -93,7 +93,7 @@ defmodule Git.RepoTest do
 
     test "initializes a bare repository" do
       dir = tmp_dir() <> "_bare"
-      on_exit(fn -> File.rm_rf!(dir) end)
+      on_exit(fn -> Git.TestHelpers.rm_rf(dir) end)
 
       assert {:ok, %Repo{} = repo} = Repo.init(dir, bare: true)
       assert repo.path == dir
@@ -109,7 +109,7 @@ defmodule Git.RepoTest do
   describe "clone/3" do
     test "clones a local repository", %{tmp_dir: dir} do
       clone_dir = tmp_dir() <> "_clone"
-      on_exit(fn -> File.rm_rf!(clone_dir) end)
+      on_exit(fn -> Git.TestHelpers.rm_rf(clone_dir) end)
 
       assert {:ok, %Repo{} = repo} = Repo.clone(dir, clone_dir)
       assert repo.path == clone_dir

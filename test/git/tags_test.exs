@@ -27,7 +27,7 @@ defmodule Git.TagsTest do
 
     cfg = Git.Config.new(working_dir: tmp_dir, env: @git_env)
 
-    on_exit(fn -> File.rm_rf!(tmp_dir) end)
+    on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
     {tmp_dir, cfg}
   end
 

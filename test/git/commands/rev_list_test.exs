@@ -29,7 +29,7 @@ defmodule Git.Commands.RevListTest do
 
   setup do
     {tmp_dir, cfg} = setup_repo("rev_list")
-    on_exit(fn -> File.rm_rf!(tmp_dir) end)
+    on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
     %{tmp_dir: tmp_dir, config: cfg}
   end
 

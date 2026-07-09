@@ -9,7 +9,7 @@ defmodule GitTest do
   # ---------------------------------------------------------------------------
 
   defp setup_repo do
-    dir = Path.join(System.tmp_dir!(), "git_wrapper_test_#{:rand.uniform(1_000_000)}")
+    dir = Path.join(System.tmp_dir!(), "git_wrapper_test_#{:erlang.unique_integer([:positive])}")
     File.mkdir_p!(dir)
 
     System.cmd("git", ["init"], cd: dir)

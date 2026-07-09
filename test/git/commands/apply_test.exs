@@ -21,7 +21,7 @@ defmodule Git.ApplyTest do
     System.cmd("git", ["add", "hello.txt"], cd: tmp_dir)
     System.cmd("git", ["commit", "-m", "initial commit"], cd: tmp_dir)
 
-    on_exit(fn -> File.rm_rf!(tmp_dir) end)
+    on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
 
     config = Config.new(working_dir: tmp_dir)
     %{tmp_dir: tmp_dir, config: config}

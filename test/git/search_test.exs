@@ -45,7 +45,7 @@ defmodule Git.SearchTest do
     {:ok, :done} = Git.add(all: true, config: cfg)
     {:ok, _} = Git.commit("chore: add utility module", config: cfg)
 
-    on_exit(fn -> File.rm_rf!(tmp_dir) end)
+    on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
 
     %{tmp_dir: tmp_dir, config: cfg}
   end

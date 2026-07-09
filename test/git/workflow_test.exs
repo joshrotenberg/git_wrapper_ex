@@ -54,7 +54,7 @@ defmodule Git.WorkflowTest do
   describe "feature_branch/3" do
     test "creates branch, runs function, returns to original branch" do
       {tmp_dir, cfg} = setup_repo("fb_basic")
-      on_exit(fn -> File.rm_rf!(tmp_dir) end)
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
 
       {:ok, result} =
         Git.Workflow.feature_branch(
@@ -81,7 +81,7 @@ defmodule Git.WorkflowTest do
 
     test "with :merge merges feature branch back" do
       {tmp_dir, cfg} = setup_repo("fb_merge")
-      on_exit(fn -> File.rm_rf!(tmp_dir) end)
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
 
       {:ok, merge_result} =
         Git.Workflow.feature_branch(
@@ -107,7 +107,7 @@ defmodule Git.WorkflowTest do
 
     test "with :delete removes the feature branch after merge" do
       {tmp_dir, cfg} = setup_repo("fb_delete")
-      on_exit(fn -> File.rm_rf!(tmp_dir) end)
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
 
       {:ok, _} =
         Git.Workflow.feature_branch(
@@ -132,7 +132,7 @@ defmodule Git.WorkflowTest do
 
     test "returns to original branch on error" do
       {tmp_dir, cfg} = setup_repo("fb_error")
-      on_exit(fn -> File.rm_rf!(tmp_dir) end)
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
 
       {:error, :something_went_wrong} =
         Git.Workflow.feature_branch(
@@ -156,7 +156,7 @@ defmodule Git.WorkflowTest do
   describe "sync/1" do
     test "syncs with remote using rebase strategy" do
       {tmp_dir, local_dir, remote_dir, cfg} = setup_remote_repo("sync_rebase")
-      on_exit(fn -> File.rm_rf!(tmp_dir) end)
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
 
       # Create a second clone that pushes a new commit
       second_dir = Path.join(tmp_dir, "second")
@@ -196,7 +196,7 @@ defmodule Git.WorkflowTest do
   describe "squash_merge/2" do
     test "squash merges a branch into a single commit" do
       {tmp_dir, cfg} = setup_repo("squash")
-      on_exit(fn -> File.rm_rf!(tmp_dir) end)
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
 
       # Create feature branch with multiple commits
       {:ok, _} = Git.checkout(branch: "feat/squash-test", create: true, config: cfg)
@@ -232,7 +232,7 @@ defmodule Git.WorkflowTest do
 
     test "squash merge with :delete removes the source branch" do
       {tmp_dir, cfg} = setup_repo("squash_delete")
-      on_exit(fn -> File.rm_rf!(tmp_dir) end)
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
 
       {:ok, _} = Git.checkout(branch: "feat/to-delete", create: true, config: cfg)
       File.write!(Path.join(tmp_dir, "squash_del.txt"), "content\n")
@@ -259,7 +259,7 @@ defmodule Git.WorkflowTest do
   describe "commit_all/2" do
     test "stages and commits all changes" do
       {tmp_dir, cfg} = setup_repo("commit_all")
-      on_exit(fn -> File.rm_rf!(tmp_dir) end)
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
 
       # Create multiple files without staging
       File.write!(Path.join(tmp_dir, "a.txt"), "aaa\n")
@@ -286,7 +286,7 @@ defmodule Git.WorkflowTest do
   describe "amend/1" do
     test "amends last commit with a new message" do
       {tmp_dir, cfg} = setup_repo("amend_msg")
-      on_exit(fn -> File.rm_rf!(tmp_dir) end)
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
 
       # Create a commit to amend
       File.write!(Path.join(tmp_dir, "amend.txt"), "content\n")
@@ -304,7 +304,7 @@ defmodule Git.WorkflowTest do
 
     test "amend without message reuses the existing message" do
       {tmp_dir, cfg} = setup_repo("amend_no_msg")
-      on_exit(fn -> File.rm_rf!(tmp_dir) end)
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
 
       File.write!(Path.join(tmp_dir, "amend2.txt"), "content\n")
       {:ok, :done} = Git.add(files: ["amend2.txt"], config: cfg)
@@ -320,7 +320,7 @@ defmodule Git.WorkflowTest do
 
     test "amend with :all stages all changes before amending" do
       {tmp_dir, cfg} = setup_repo("amend_all")
-      on_exit(fn -> File.rm_rf!(tmp_dir) end)
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
 
       # Create and commit a tracked file
       File.write!(Path.join(tmp_dir, "tracked.txt"), "original\n")

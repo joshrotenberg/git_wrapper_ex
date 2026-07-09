@@ -22,7 +22,7 @@ defmodule Git.RestoreTest do
     System.cmd("git", ["add", "file.txt"], cd: tmp_dir)
     System.cmd("git", ["commit", "-m", "initial"], cd: tmp_dir)
 
-    on_exit(fn -> File.rm_rf!(tmp_dir) end)
+    on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
 
     config = Config.new(working_dir: tmp_dir)
 

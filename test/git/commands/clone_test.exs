@@ -118,8 +118,8 @@ defmodule Git.Commands.CloneTest do
     File.mkdir_p!(dest_parent)
 
     on_exit(fn ->
-      File.rm_rf!(src_dir)
-      File.rm_rf!(dest_parent)
+      Git.TestHelpers.rm_rf(src_dir)
+      Git.TestHelpers.rm_rf(dest_parent)
     end)
 
     config = Config.new(working_dir: dest_parent)
