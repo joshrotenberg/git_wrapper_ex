@@ -52,6 +52,28 @@ defmodule Git.Commands.CloneTest do
                  "local-repo"
                ]
     end
+
+    test "adds --filter for a partial clone" do
+      assert Clone.args(%Clone{url: "u", filter: "blob:none"}) ==
+               ["clone", "--filter=blob:none", "u"]
+    end
+
+    test "adds boolean flags" do
+      assert Clone.args(%Clone{url: "u", sparse: true, single_branch: true, bare: true}) ==
+               ["clone", "--sparse", "--single-branch", "--bare", "u"]
+    end
+
+    test "adds --origin and --config" do
+      command = %Clone{url: "u", origin: "upstream", set_config: [{"core.autocrlf", "false"}]}
+
+      assert Clone.args(command) ==
+               ["clone", "--origin=upstream", "--config", "core.autocrlf=false", "u"]
+    end
+
+    test "keeps flag order stable when several options combine" do
+      assert Clone.args(%Clone{url: "u", depth: 1, filter: "blob:none", bare: true}) ==
+               ["clone", "--depth=1", "--filter=blob:none", "--bare", "u"]
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -165,6 +187,23 @@ defmodule Git.Commands.CloneTest do
 
       assert {:error, {_stdout, _exit_code}} =
                Git.clone("/nonexistent/path/to/repo", config: config)
+    end
+
+    test "bare clone has no working tree", %{
+      src_dir: src_dir,
+      dest_parent: dest_parent,
+      config: config
+    } do
+      assert {:ok, :done} = Git.clone(src_dir, bare: true, directory: "bare.git", config: config)
+
+      cloned = Path.join(dest_parent, "bare.git")
+      assert File.exists?(Path.join(cloned, "HEAD"))
+      refute File.dir?(Path.join(cloned, ".git"))
+    end
+
+    test "partial clone with --filter succeeds", %{src_dir: src_dir, config: config} do
+      assert {:ok, :done} =
+               Git.clone(src_dir, filter: "blob:none", directory: "partial", config: config)
     end
   end
 end
