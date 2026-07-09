@@ -1,8 +1,66 @@
 defmodule Git.StatusTest do
   use ExUnit.Case, async: true
 
+  alias Git.Commands.Status, as: StatusCommand
   alias Git.Config
   alias Git.Status
+
+  describe "args/1" do
+    test "default keeps porcelain v1 and branch flags only" do
+      assert StatusCommand.args(%StatusCommand{}) == ["status", "--porcelain=v1", "-b"]
+    end
+
+    test "untracked_files appends --untracked-files=<mode>" do
+      for mode <- [:no, :normal, :all] do
+        assert StatusCommand.args(%StatusCommand{untracked_files: mode}) ==
+                 ["status", "--porcelain=v1", "-b", "--untracked-files=#{mode}"]
+      end
+    end
+
+    test "ignored appends --ignored" do
+      assert StatusCommand.args(%StatusCommand{ignored: true}) ==
+               ["status", "--porcelain=v1", "-b", "--ignored"]
+    end
+
+    test "ignore_submodules appends --ignore-submodules=<when>" do
+      assert StatusCommand.args(%StatusCommand{ignore_submodules: "all"}) ==
+               ["status", "--porcelain=v1", "-b", "--ignore-submodules=all"]
+    end
+
+    test "renames appends --renames" do
+      assert StatusCommand.args(%StatusCommand{renames: true}) ==
+               ["status", "--porcelain=v1", "-b", "--renames"]
+    end
+
+    test "no_renames appends --no-renames" do
+      assert StatusCommand.args(%StatusCommand{no_renames: true}) ==
+               ["status", "--porcelain=v1", "-b", "--no-renames"]
+    end
+
+    test "pathspec appends paths after a -- separator" do
+      assert StatusCommand.args(%StatusCommand{pathspec: ["lib", "test"]}) ==
+               ["status", "--porcelain=v1", "-b", "--", "lib", "test"]
+    end
+
+    test "combines multiple options in order" do
+      command = %StatusCommand{
+        untracked_files: :all,
+        ignored: true,
+        pathspec: ["lib/foo.ex"]
+      }
+
+      assert StatusCommand.args(command) ==
+               [
+                 "status",
+                 "--porcelain=v1",
+                 "-b",
+                 "--untracked-files=all",
+                 "--ignored",
+                 "--",
+                 "lib/foo.ex"
+               ]
+    end
+  end
 
   setup do
     tmp_dir =
@@ -49,6 +107,24 @@ defmodule Git.StatusTest do
       assert entry.index == "?"
       assert entry.working_tree == "?"
       assert entry.path == "new_file.txt"
+    end
+  end
+
+  describe "untracked_files option" do
+    test "untracked_files: :no hides untracked entries the default shows", %{
+      tmp_dir: tmp_dir,
+      config: config
+    } do
+      File.write!(Path.join(tmp_dir, "new_file.txt"), "hello")
+
+      assert {:ok, %Status{} = default_status} = Git.status(config: config)
+      assert Enum.any?(default_status.entries, &(&1.path == "new_file.txt"))
+
+      assert {:ok, %Status{} = hidden_status} =
+               Git.status(config: config, untracked_files: :no)
+
+      refute Enum.any?(hidden_status.entries, &(&1.path == "new_file.txt"))
+      assert hidden_status.branch == "main"
     end
   end
 
