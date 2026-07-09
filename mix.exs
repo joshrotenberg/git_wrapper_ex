@@ -6,6 +6,7 @@ defmodule Git.MixProject do
       app: :git,
       version: "0.5.0",
       elixir: "~> 1.18",
+      elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       description: "A clean Elixir wrapper for the git CLI with parsed output structs",
       source_url: "https://github.com/joshrotenberg/git_wrapper_ex",
@@ -21,6 +22,9 @@ defmodule Git.MixProject do
       extra_applications: [:logger]
     ]
   end
+
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_), do: ["lib"]
 
   defp deps do
     [
