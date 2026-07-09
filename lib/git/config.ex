@@ -7,16 +7,29 @@ defmodule Git.Config do
   """
 
   @default_timeout 30_000
+  @default_runner :system_cmd
+
+  @typedoc """
+  How git commands are executed.
+
+    * `:system_cmd` - the default, `System.cmd/3` via `Git.Runner.SystemCmd`.
+    * `:forcola` - `Git.Runner.Forcola`, which kills the git process group on
+      timeout. Requires the optional `:forcola` dependency; falls back to
+      `:system_cmd` when it is not available.
+    * any module implementing the `Git.Runner` behaviour.
+  """
+  @type runner :: :system_cmd | :forcola | module()
 
   @type t :: %__MODULE__{
           binary: String.t(),
           working_dir: String.t() | nil,
           env: [{String.t(), String.t()}],
-          timeout: pos_integer()
+          timeout: pos_integer(),
+          runner: runner()
         }
 
   @enforce_keys [:binary]
-  defstruct [:binary, :working_dir, env: [], timeout: @default_timeout]
+  defstruct [:binary, :working_dir, env: [], timeout: @default_timeout, runner: @default_runner]
 
   @doc """
   Creates a new `Git.Config` struct.
@@ -27,6 +40,8 @@ defmodule Git.Config do
     * `:working_dir` - working directory for git commands (default: `nil`, uses current directory)
     * `:env` - list of `{key, value}` tuples for environment variables (default: `[]`)
     * `:timeout` - command timeout in milliseconds (default: `#{@default_timeout}`)
+    * `:runner` - how commands are executed (default: `#{inspect(@default_runner)}`).
+      See the `t:runner/0` type.
 
   ## Examples
 
@@ -40,6 +55,10 @@ defmodule Git.Config do
       iex> config.timeout
       10_000
 
+      iex> config = Git.Config.new(runner: :forcola)
+      iex> config.runner
+      :forcola
+
   """
   @spec new(keyword()) :: t()
   def new(opts \\ []) do
@@ -47,7 +66,8 @@ defmodule Git.Config do
       binary: Keyword.get(opts, :binary, find_binary()),
       working_dir: Keyword.get(opts, :working_dir),
       env: Keyword.get(opts, :env, []),
-      timeout: Keyword.get(opts, :timeout, @default_timeout)
+      timeout: Keyword.get(opts, :timeout, @default_timeout),
+      runner: Keyword.get(opts, :runner, @default_runner)
     }
   end
 

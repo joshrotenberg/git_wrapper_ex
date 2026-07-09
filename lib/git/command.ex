@@ -23,8 +23,13 @@ defmodule Git.Command do
   Runs a git command.
 
   Takes a module implementing the `Git.Command` behaviour, a command
-  struct, and a `Git.Config`. Builds the full argument list, executes
-  git via `System.cmd/3`, and delegates parsing to the command module.
+  struct, and a `Git.Config`. Builds the full argument list, executes git
+  through the configured `Git.Runner`, and delegates parsing to the command
+  module.
+
+  Execution is routed through `config.runner` (see `Git.Config` and
+  `Git.Runner`). The default `Git.Runner.SystemCmd` uses `System.cmd/3`;
+  `Git.Runner.Forcola` adds group-kill semantics on timeout.
 
   If the command exceeds the configured timeout, returns `{:error, :timeout}`.
 
@@ -36,19 +41,30 @@ defmodule Git.Command do
   @spec run(module(), struct(), Config.t()) :: {:ok, term()} | {:error, term()}
   def run(mod, command, %Config{} = config) do
     all_args = Config.base_args(config) ++ mod.args(command)
-    opts = Config.cmd_opts(config)
+    opts = Keyword.put(Config.cmd_opts(config), :timeout, config.timeout)
 
-    task =
-      Task.async(fn ->
-        System.cmd(config.binary, all_args, opts)
-      end)
+    case runner(config).run(config.binary, all_args, opts) do
+      {:ok, {stdout, exit_code}} -> mod.parse_output(stdout, exit_code)
+      {:error, reason} -> {:error, reason}
+    end
+  end
 
-    case Task.yield(task, config.timeout) || Task.shutdown(task) do
-      {:ok, {stdout, exit_code}} ->
-        mod.parse_output(stdout, exit_code)
+  @doc false
+  @spec runner(Config.t()) :: module()
+  def runner(%Config{runner: runner}) do
+    case runner do
+      :system_cmd ->
+        Git.Runner.SystemCmd
 
-      nil ->
-        {:error, :timeout}
+      :forcola ->
+        if Code.ensure_loaded?(Git.Runner.Forcola) do
+          Git.Runner.Forcola
+        else
+          Git.Runner.SystemCmd
+        end
+
+      module when is_atom(module) ->
+        module
     end
   end
 end
