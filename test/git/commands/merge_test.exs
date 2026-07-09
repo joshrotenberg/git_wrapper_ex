@@ -1,6 +1,7 @@
 defmodule Git.MergeTest do
   use ExUnit.Case, async: true
 
+  alias Git.Commands.Merge
   alias Git.Config
   alias Git.MergeResult
 
@@ -66,6 +67,55 @@ defmodule Git.MergeTest do
     )
 
     System.cmd("git", ["checkout", "main"], cd: tmp_dir)
+  end
+
+  defp commit_all(tmp_dir, message) do
+    System.cmd("git", ["add", "-A"], cd: tmp_dir)
+
+    System.cmd(
+      "git",
+      ["-c", "user.name=Test User", "-c", "user.email=test@test.com", "commit", "-m", message],
+      cd: tmp_dir
+    )
+  end
+
+  describe "Git.Commands.Merge args/1" do
+    test "existing output is unchanged" do
+      assert Merge.args(%Merge{branch: "feature", no_ff: true}) == ["merge", "--no-ff", "feature"]
+    end
+
+    test "builds strategy and repeated strategy options" do
+      command = %Merge{
+        branch: "b",
+        strategy: "ort",
+        strategy_option: ["ours", "ignore-space-change"]
+      }
+
+      assert Merge.args(command) ==
+               [
+                 "merge",
+                 "--strategy",
+                 "ort",
+                 "--strategy-option",
+                 "ours",
+                 "--strategy-option",
+                 "ignore-space-change",
+                 "b"
+               ]
+    end
+
+    test "builds --ff-only with a message" do
+      assert Merge.args(%Merge{branch: "b", ff_only: true, message: "msg"}) ==
+               ["merge", "--ff-only", "-m", "msg", "b"]
+    end
+
+    test "builds --continue with no other arguments" do
+      assert Merge.args(%Merge{continue: true}) == ["merge", "--continue"]
+    end
+
+    test "builds --quit" do
+      assert Merge.args(%Merge{quit: true}) == ["merge", "--quit"]
+    end
   end
 
   describe "merge branch (fast-forward)" do
@@ -146,6 +196,60 @@ defmodule Git.MergeTest do
 
       # Now abort it
       assert {:ok, :done} = Git.merge(:abort, config: config)
+    end
+  end
+
+  describe "merge strategy options and drivers" do
+    test "-Xours auto-resolves a conflicting merge", %{tmp_dir: tmp_dir, config: config} do
+      path = Path.join(tmp_dir, "conflict.txt")
+      File.write!(path, "base\n")
+      commit_all(tmp_dir, "base")
+
+      System.cmd("git", ["checkout", "-b", "feat/conflict"], cd: tmp_dir)
+      File.write!(path, "feat\n")
+      commit_all(tmp_dir, "feat")
+      System.cmd("git", ["checkout", "main"], cd: tmp_dir)
+      File.write!(path, "main\n")
+      commit_all(tmp_dir, "main")
+
+      assert {:ok, %MergeResult{}} =
+               Git.merge("feat/conflict",
+                 config: config,
+                 strategy_option: ["ours"],
+                 no_edit: true
+               )
+
+      assert File.read!(path) == "main\n"
+    end
+
+    test "--ff-only errors when a fast-forward is impossible", %{tmp_dir: tmp_dir, config: config} do
+      create_branch_with_commit(tmp_dir, "feat/div", "feat.txt", "f\n")
+      File.write!(Path.join(tmp_dir, "main.txt"), "m\n")
+      commit_all(tmp_dir, "main diverge")
+
+      assert {:error, {_output, exit_code}} = Git.merge("feat/div", config: config, ff_only: true)
+      assert exit_code != 0
+    end
+
+    test "merge(:continue) completes a merge after resolving conflicts",
+         %{tmp_dir: tmp_dir, config: config} do
+      path = Path.join(tmp_dir, "c.txt")
+      File.write!(path, "base\n")
+      commit_all(tmp_dir, "base")
+
+      System.cmd("git", ["checkout", "-b", "feat/cont"], cd: tmp_dir)
+      File.write!(path, "feat\n")
+      commit_all(tmp_dir, "feat")
+      System.cmd("git", ["checkout", "main"], cd: tmp_dir)
+      File.write!(path, "main\n")
+      commit_all(tmp_dir, "main")
+
+      assert {:error, _} = Git.merge("feat/cont", config: config)
+
+      File.write!(path, "resolved\n")
+      System.cmd("git", ["add", "c.txt"], cd: tmp_dir)
+
+      assert {:ok, :done} = Git.merge(:continue, config: config)
     end
   end
 

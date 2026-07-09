@@ -2,8 +2,10 @@ defmodule Git.Commands.Merge do
   @moduledoc """
   Implements the `Git.Command` behaviour for `git merge`.
 
-  Supports merging a branch, the `--no-ff` flag to force a merge commit, and
-  `--abort` to abort an in-progress merge.
+  Merges a branch, with `--no-ff`, `--ff-only`, `--squash`, `--no-commit`,
+  `--no-edit`, `--allow-unrelated-histories`, a message (`-m`), a strategy
+  (`-s`), and strategy options (`-X`, repeatable). Also drives the in-progress
+  merge with `--abort`, `--continue`, and `--quit`.
   """
 
   @behaviour Git.Command
@@ -13,14 +15,32 @@ defmodule Git.Commands.Merge do
   @type t :: %__MODULE__{
           branch: String.t() | nil,
           no_ff: boolean(),
+          ff_only: boolean(),
           squash: boolean(),
-          abort: boolean()
+          no_commit: boolean(),
+          no_edit: boolean(),
+          allow_unrelated_histories: boolean(),
+          message: String.t() | nil,
+          strategy: String.t() | nil,
+          strategy_option: [String.t()],
+          abort: boolean(),
+          continue: boolean(),
+          quit: boolean()
         }
 
   defstruct branch: nil,
             no_ff: false,
+            ff_only: false,
             squash: false,
-            abort: false
+            no_commit: false,
+            no_edit: false,
+            allow_unrelated_histories: false,
+            message: nil,
+            strategy: nil,
+            strategy_option: [],
+            abort: false,
+            continue: false,
+            quit: false
 
   # Process dictionary key used to communicate the operation mode from args/1
   # to parse_output/2. Both are called from the same process inside
@@ -30,8 +50,8 @@ defmodule Git.Commands.Merge do
   @doc """
   Returns the argument list for `git merge`.
 
-  - When `:abort` is `true`, builds `git merge --abort`.
-  - Otherwise builds `git merge [--no-ff] <branch>`.
+  - `:abort`/`:continue`/`:quit` build the corresponding in-progress-merge form.
+  - Otherwise builds `git merge [flags] <branch>`.
 
   ## Examples
 
@@ -47,28 +67,42 @@ defmodule Git.Commands.Merge do
       iex> Git.Commands.Merge.args(%Git.Commands.Merge{branch: "feature", squash: true})
       ["merge", "--squash", "feature"]
 
+      iex> Git.Commands.Merge.args(%Git.Commands.Merge{branch: "f", strategy_option: ["ours", "ignore-all-space"]})
+      ["merge", "--strategy-option", "ours", "--strategy-option", "ignore-all-space", "f"]
+
   """
   @spec args(t()) :: [String.t()]
   @impl true
   def args(%__MODULE__{abort: true}) do
-    Process.put(@mode_key, :abort)
+    Process.put(@mode_key, :done)
     ["merge", "--abort"]
+  end
+
+  def args(%__MODULE__{quit: true}) do
+    Process.put(@mode_key, :done)
+    ["merge", "--quit"]
+  end
+
+  def args(%__MODULE__{continue: true}) do
+    Process.put(@mode_key, :done)
+    # `git merge --continue` takes no other arguments; it uses the prepared
+    # merge message and does not open an editor under a non-interactive shell.
+    ["merge", "--continue"]
   end
 
   def args(%__MODULE__{branch: branch} = command) when is_binary(branch) do
     Process.put(@mode_key, :merge)
 
     ["merge"]
-    |> maybe_add(command.no_ff, "--no-ff")
-    |> maybe_add(command.squash, "--squash")
+    |> merge_flags(command)
     |> Kernel.++([branch])
   end
 
   @doc """
   Parses the output of `git merge`.
 
-  For `--abort` operations (exit code 0), returns `{:ok, :done}`.
-  For merge operations (exit code 0), parses into a `Git.MergeResult` struct.
+  For `--abort`/`--continue`/`--quit` (exit code 0), returns `{:ok, :done}`.
+  For a branch merge (exit code 0), parses into a `Git.MergeResult` struct.
   On failure, returns `{:error, {stdout, exit_code}}`.
   """
   @spec parse_output(String.t(), non_neg_integer()) ::
@@ -76,13 +110,35 @@ defmodule Git.Commands.Merge do
   @impl true
   def parse_output(stdout, 0) do
     case Process.get(@mode_key, :merge) do
-      :abort -> {:ok, :done}
+      :done -> {:ok, :done}
       :merge -> {:ok, MergeResult.parse(stdout)}
     end
   end
 
   def parse_output(stdout, exit_code), do: {:error, {stdout, exit_code}}
 
+  defp merge_flags(args, command) do
+    args
+    |> maybe_add(command.no_ff, "--no-ff")
+    |> maybe_add(command.ff_only, "--ff-only")
+    |> maybe_add(command.squash, "--squash")
+    |> maybe_add(command.no_commit, "--no-commit")
+    |> maybe_add(command.no_edit, "--no-edit")
+    |> maybe_add(command.allow_unrelated_histories, "--allow-unrelated-histories")
+    |> maybe_add_value(command.strategy, "--strategy")
+    |> add_strategy_options(command.strategy_option)
+    |> maybe_add_value(command.message, "-m")
+  end
+
+  defp add_strategy_options(args, []), do: args
+
+  defp add_strategy_options(args, options) when is_list(options) do
+    Enum.reduce(options, args, fn option, acc -> acc ++ ["--strategy-option", option] end)
+  end
+
   defp maybe_add(args, true, flag), do: args ++ [flag]
   defp maybe_add(args, false, _flag), do: args
+
+  defp maybe_add_value(args, nil, _flag), do: args
+  defp maybe_add_value(args, value, flag) when is_binary(value), do: args ++ [flag, value]
 end

@@ -303,31 +303,53 @@ defmodule Git do
   end
 
   @doc """
-  Runs `git merge` to merge a branch or abort an in-progress merge.
+  Runs `git merge` to merge a branch or drive an in-progress merge.
 
-  Pass a branch name as the first argument to merge it into the current branch.
-  Pass `:abort` to abort an in-progress merge.
+  Pass a branch name to merge it into the current branch. Pass `:abort`,
+  `:continue`, or `:quit` to drive an in-progress merge.
 
   ## Options
 
     * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
-    * `:no_ff` - when `true`, forces a merge commit even for fast-forward merges
-      (`--no-ff` flag, default `false`)
+    * `:no_ff` - force a merge commit even for fast-forward merges (default `false`)
+    * `:ff_only` - refuse to merge unless it can fast-forward (default `false`)
+    * `:squash` - squash the merged commits into the index (default `false`)
+    * `:no_commit` - merge but do not create the merge commit (default `false`)
+    * `:no_edit` - accept the auto-generated merge message (default `false`)
+    * `:allow_unrelated_histories` - merge histories with no common ancestor (default `false`)
+    * `:message` - merge commit message (`-m`, default `nil`)
+    * `:strategy` - merge strategy (`-s`, default `nil`)
+    * `:strategy_option` - list of strategy options (`-X`, repeatable, default `[]`)
 
   ## Examples
 
       Git.merge("feature-branch")
       Git.merge("feature-branch", no_ff: true)
+      Git.merge("feature-branch", strategy_option: ["ours"])
       Git.merge(:abort)
+      Git.merge(:continue)
+      Git.merge(:quit)
 
   """
-  @spec merge(String.t() | :abort, keyword()) ::
+  @spec merge(String.t() | :abort | :continue | :quit, keyword()) ::
           {:ok, Git.MergeResult.t()} | {:ok, :done} | {:error, term()}
-  def merge(branch_or_abort, opts \\ [])
+  def merge(branch_or_action, opts \\ [])
 
   def merge(:abort, opts) do
     {config, _rest} = Keyword.pop(opts, :config, Config.new())
     command = %Git.Commands.Merge{abort: true}
+    Git.Command.run(Git.Commands.Merge, command, config)
+  end
+
+  def merge(:continue, opts) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.Merge, Keyword.put(rest, :continue, true))
+    Git.Command.run(Git.Commands.Merge, command, config)
+  end
+
+  def merge(:quit, opts) do
+    {config, _rest} = Keyword.pop(opts, :config, Config.new())
+    command = %Git.Commands.Merge{quit: true}
     Git.Command.run(Git.Commands.Merge, command, config)
   end
 
