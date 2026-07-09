@@ -23,7 +23,7 @@ defmodule Git.StashTest do
     File.write!(Path.join(dir, "init.txt"), "init\n")
     System.cmd("git", ["add", "."], cd: dir)
     System.cmd("git", ["commit", "-m", "init"], cd: dir)
-    on_exit(fn -> File.rm_rf!(dir) end)
+    on_exit(fn -> Git.TestHelpers.rm_rf(dir) end)
     {Git.Config.new(working_dir: dir), dir}
   end
 

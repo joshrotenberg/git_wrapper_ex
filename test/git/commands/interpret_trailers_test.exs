@@ -28,7 +28,7 @@ defmodule Git.InterpretTrailersTest do
     {:ok, :done} =
       Git.git_config(set_key: "user.email", set_value: "test@test.com", config: cfg)
 
-    on_exit(fn -> File.rm_rf!(tmp_dir) end)
+    on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
     {tmp_dir, cfg}
   end
 

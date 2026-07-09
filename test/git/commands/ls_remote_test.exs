@@ -52,7 +52,7 @@ defmodule Git.LsRemoteTest do
 
   setup do
     {tmp_dir, local_dir, remote_dir, config} = setup_repo_with_remote()
-    on_exit(fn -> File.rm_rf!(tmp_dir) end)
+    on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
     %{tmp_dir: tmp_dir, local_dir: local_dir, remote_dir: remote_dir, config: config}
   end
 

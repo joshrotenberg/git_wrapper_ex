@@ -22,7 +22,7 @@ defmodule Git.Commands.SymbolicRefTest do
 
   setup do
     {tmp_dir, config} = setup_repo()
-    on_exit(fn -> File.rm_rf!(tmp_dir) end)
+    on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
     %{tmp_dir: tmp_dir, config: config}
   end
 

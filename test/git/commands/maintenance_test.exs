@@ -29,7 +29,7 @@ defmodule Git.MaintenanceTest do
       Git.git_config(set_key: "user.email", set_value: "test@test.com", config: cfg)
 
     {:ok, _} = Git.commit("initial", allow_empty: true, config: cfg)
-    on_exit(fn -> File.rm_rf!(tmp_dir) end)
+    on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
     {tmp_dir, cfg}
   end
 

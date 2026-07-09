@@ -25,7 +25,7 @@ defmodule Git.PatchTest do
     System.cmd("git", ["add", "."], cd: tmp_dir)
     System.cmd("git", ["commit", "-m", "initial commit"], cd: tmp_dir, env: @git_env)
 
-    on_exit(fn -> File.rm_rf!(tmp_dir) end)
+    on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
 
     config = Git.Config.new(working_dir: tmp_dir, env: @git_env)
 

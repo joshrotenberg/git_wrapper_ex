@@ -17,7 +17,7 @@ defmodule Git.HooksTest do
     System.cmd("git", ["config", "user.email", "test@example.com"], cd: tmp_dir)
     System.cmd("git", ["config", "user.name", "Test User"], cd: tmp_dir)
 
-    on_exit(fn -> File.rm_rf!(tmp_dir) end)
+    on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
     config = Git.Config.new(working_dir: tmp_dir)
     %{tmp_dir: tmp_dir, config: config}
   end

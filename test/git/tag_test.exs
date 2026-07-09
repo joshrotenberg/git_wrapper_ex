@@ -20,7 +20,7 @@ defmodule Git.TagTest do
     System.cmd("git", ["config", "user.email", "test@example.com"], cd: dir)
     System.cmd("git", ["config", "user.name", "Test User"], cd: dir)
     System.cmd("git", ["commit", "--allow-empty", "-m", "init"], cd: dir)
-    on_exit(fn -> File.rm_rf!(dir) end)
+    on_exit(fn -> Git.TestHelpers.rm_rf(dir) end)
     {Git.Config.new(working_dir: dir), dir}
   end
 

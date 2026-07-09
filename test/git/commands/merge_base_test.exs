@@ -51,7 +51,7 @@ defmodule Git.Commands.MergeBaseTest do
     System.cmd("git", ["checkout", "main"], cd: tmp_dir, env: @env)
     {:ok, _} = Git.commit("third", allow_empty: true, config: cfg)
 
-    on_exit(fn -> File.rm_rf!(tmp_dir) end)
+    on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
 
     %{tmp_dir: tmp_dir, config: cfg, initial_sha: initial_sha}
   end

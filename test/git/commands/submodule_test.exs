@@ -260,7 +260,7 @@ defmodule Git.SubmoduleTest do
   describe "status on repo with no submodules" do
     test "returns empty list" do
       {tmp_dir, _lib_dir, _project_dir, proj_cfg} = setup_repos("empty_status")
-      on_exit(fn -> File.rm_rf!(tmp_dir) end)
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
 
       assert {:ok, []} = Git.submodule(config: proj_cfg)
     end
@@ -269,7 +269,7 @@ defmodule Git.SubmoduleTest do
   describe "add and status" do
     test "adds a submodule and shows it in status" do
       {tmp_dir, lib_dir, _project_dir, proj_cfg} = setup_repos("add_status")
-      on_exit(fn -> File.rm_rf!(tmp_dir) end)
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
 
       # Add the library as a submodule
       assert {:ok, :done} =
@@ -288,7 +288,7 @@ defmodule Git.SubmoduleTest do
   describe "init and update" do
     test "initializes and updates submodules" do
       {tmp_dir, lib_dir, project_dir, proj_cfg} = setup_repos("init_update")
-      on_exit(fn -> File.rm_rf!(tmp_dir) end)
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
 
       # Add submodule and commit
       assert {:ok, :done} =
@@ -324,7 +324,7 @@ defmodule Git.SubmoduleTest do
   describe "deinit" do
     test "deinitializes a submodule" do
       {tmp_dir, lib_dir, _project_dir, proj_cfg} = setup_repos("deinit")
-      on_exit(fn -> File.rm_rf!(tmp_dir) end)
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
 
       # Add submodule and commit
       assert {:ok, :done} =
@@ -342,7 +342,7 @@ defmodule Git.SubmoduleTest do
   describe "sync" do
     test "syncs submodule URLs" do
       {tmp_dir, lib_dir, _project_dir, proj_cfg} = setup_repos("sync")
-      on_exit(fn -> File.rm_rf!(tmp_dir) end)
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
 
       # Add submodule and commit
       assert {:ok, :done} =

@@ -173,7 +173,7 @@ defmodule Git.Commands.FetchTest do
 
     System.cmd("git", ["push", "-u", "origin", "main"], git_opts)
 
-    on_exit(fn -> File.rm_rf!(tmp_dir) end)
+    on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
 
     config =
       Config.new(
