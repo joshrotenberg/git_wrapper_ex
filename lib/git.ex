@@ -362,9 +362,18 @@ defmodule Git do
   ## Options
 
     * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
-    * `:depth` - create a shallow clone with the given number of commits (`--depth` flag)
-    * `:branch` - check out the given branch after cloning (`--branch` flag)
+    * `:depth` - create a shallow clone with the given number of commits (`--depth`)
+    * `:branch` - check out the given branch after cloning (`--branch`)
     * `:directory` - name of the target directory (default: inferred from the URL)
+    * `:filter` - partial clone filter spec, e.g. `"blob:none"` (`--filter`)
+    * `:sparse` - initialize a sparse-checkout (`--sparse`, default `false`)
+    * `:single_branch` - clone only the history of the checked-out branch (default `false`)
+    * `:no_checkout` - do not check out HEAD after cloning (default `false`)
+    * `:bare` - create a bare repository (default `false`)
+    * `:mirror` - set up a mirror of the source (default `false`)
+    * `:recurse_submodules` - initialize and clone submodules (default `false`)
+    * `:origin` - name for the source remote instead of `origin` (`--origin`)
+    * `:set_config` - list of `{key, value}` config to set in the new repo (`--config`)
 
   ## Examples
 
