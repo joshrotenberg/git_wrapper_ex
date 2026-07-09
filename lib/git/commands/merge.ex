@@ -85,9 +85,12 @@ defmodule Git.Commands.Merge do
 
   def args(%__MODULE__{continue: true}) do
     Process.put(@mode_key, :done)
-    # `git merge --continue` takes no other arguments; it uses the prepared
-    # merge message and does not open an editor under a non-interactive shell.
-    ["merge", "--continue"]
+    # Conclude the in-progress merge non-interactively. `git merge --continue`
+    # rejects `--no-edit`/`-m` ("expects no arguments") and opens an editor for
+    # the merge message, which fails with no TTY/editor. `git commit --no-edit`
+    # is git's documented equivalent: it concludes the merge using the prepared
+    # MERGE_MSG without an editor.
+    ["commit", "--no-edit"]
   end
 
   def args(%__MODULE__{branch: branch} = command) when is_binary(branch) do

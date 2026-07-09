@@ -109,8 +109,8 @@ defmodule Git.MergeTest do
                ["merge", "--ff-only", "-m", "msg", "b"]
     end
 
-    test "builds --continue with no other arguments" do
-      assert Merge.args(%Merge{continue: true}) == ["merge", "--continue"]
+    test "continue concludes the merge non-interactively via commit --no-edit" do
+      assert Merge.args(%Merge{continue: true}) == ["commit", "--no-edit"]
     end
 
     test "builds --quit" do
