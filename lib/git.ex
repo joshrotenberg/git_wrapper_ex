@@ -259,7 +259,16 @@ defmodule Git do
 
     * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
     * `:files` - list of file paths to stage (default `[]`)
-    * `:all` - stage all changes including deletions (`--all` flag, default `false`)
+    * `:all` - stage all changes including deletions (`--all`, default `false`)
+    * `:update` - stage tracked modifications and deletions only (`-u`, default `false`)
+    * `:force` - stage ignored files (`-f`, default `false`)
+    * `:dry_run` - show what would be staged without staging (`-n`, default `false`)
+    * `:intent_to_add` - record intent to add without content (`-N`, default `false`)
+    * `:renormalize` - re-apply the clean filter to tracked files (default `false`)
+    * `:chmod` - set the executable bit, `"+x"` or `"-x"` (default `nil`)
+
+  Flags and `:files` compose, so `Git.add(update: true, files: ["lib"])` runs
+  `git add --update lib`.
 
   """
   @spec add(keyword()) :: {:ok, :done} | {:error, term()}
