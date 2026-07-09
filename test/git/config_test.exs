@@ -51,4 +51,54 @@ defmodule Git.ConfigTest do
       refute Keyword.has_key?(opts, :cd)
     end
   end
+
+  describe "base_args/1 with extra_config" do
+    test "emits a -c key=value pair for each entry" do
+      config = Config.new(extra_config: [{"user.name", "X"}, {"gc.auto", "0"}])
+
+      assert Config.base_args(config) == ["-c", "user.name=X", "-c", "gc.auto=0"]
+    end
+
+    test "returns [] when extra_config is empty" do
+      assert Config.base_args(Config.new()) == []
+    end
+  end
+
+  describe "extra_config reaches git" do
+    setup do
+      tmp_dir =
+        Path.join(
+          System.tmp_dir!(),
+          "git_config_test_#{:erlang.unique_integer([:positive])}"
+        )
+
+      File.mkdir_p!(tmp_dir)
+      base = Config.new(working_dir: tmp_dir)
+      {:ok, :done} = Git.init(config: base)
+      {:ok, :done} = Git.git_config(set_key: "user.name", set_value: "Repo User", config: base)
+
+      {:ok, :done} =
+        Git.git_config(set_key: "user.email", set_value: "repo@example.com", config: base)
+
+      File.write!(Path.join(tmp_dir, "a.txt"), "hi\n")
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
+
+      %{tmp_dir: tmp_dir}
+    end
+
+    test "-c overrides repo config for a commit", %{tmp_dir: tmp_dir} do
+      override =
+        Config.new(
+          working_dir: tmp_dir,
+          extra_config: [{"user.name", "Override User"}, {"user.email", "override@example.com"}]
+        )
+
+      {:ok, :done} = Git.add(all: true, config: override)
+      {:ok, _} = Git.commit("test: extra_config", config: override)
+      {:ok, [commit | _]} = Git.log(config: override)
+
+      assert commit.author_name == "Override User"
+      assert commit.author_email == "override@example.com"
+    end
+  end
 end
