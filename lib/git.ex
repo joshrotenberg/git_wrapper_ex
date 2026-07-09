@@ -354,13 +354,17 @@ defmodule Git do
 
     * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
     * `:ref` - the ref to reset to (default: `"HEAD"`)
-    * `:mode` - one of `:soft`, `:mixed` (default), or `:hard`
+    * `:mode` - one of `:soft`, `:mixed` (default), `:hard`, `:merge`, or `:keep`
+      (ignored when `:files` is given)
+    * `:files` - a list of paths to unstage via `git reset <ref> -- <paths>`
+    * `:quiet` - pass `-q` (default `false`)
 
   ## Examples
 
       Git.reset()
       Git.reset(mode: :soft, ref: "HEAD~1")
       Git.reset(mode: :hard)
+      Git.reset(files: ["lib/foo.ex"])
 
   """
   @spec reset(keyword()) :: {:ok, :done} | {:error, term()}

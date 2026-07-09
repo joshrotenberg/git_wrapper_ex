@@ -62,6 +62,45 @@ defmodule Git.ResetTest do
     test "builds args with mixed mode and custom ref" do
       assert Reset.args(%Reset{ref: "HEAD~2", mode: :mixed}) == ["reset", "--mixed", "HEAD~2"]
     end
+
+    test "builds args for merge and keep modes" do
+      assert Reset.args(%Reset{mode: :merge}) == ["reset", "--merge", "HEAD"]
+      assert Reset.args(%Reset{mode: :keep}) == ["reset", "--keep", "HEAD"]
+    end
+
+    test "adds -q when quiet" do
+      assert Reset.args(%Reset{quiet: true}) == ["reset", "--mixed", "-q", "HEAD"]
+    end
+
+    test "builds the pathspec form when files are given" do
+      assert Reset.args(%Reset{files: ["a.ex", "b.ex"]}) ==
+               ["reset", "HEAD", "--", "a.ex", "b.ex"]
+    end
+
+    test "pathspec form uses the given ref and ignores mode" do
+      assert Reset.args(%Reset{files: ["a.ex"], ref: "HEAD~1", mode: :hard}) ==
+               ["reset", "HEAD~1", "--", "a.ex"]
+    end
+
+    test "pathspec form with quiet" do
+      assert Reset.args(%Reset{files: ["a.ex"], quiet: true}) ==
+               ["reset", "-q", "HEAD", "--", "a.ex"]
+    end
+  end
+
+  describe "git reset <paths> (pathspec)" do
+    test "unstages a specific file", %{tmp_dir: tmp_dir, config: config} do
+      File.write!(Path.join(tmp_dir, "staged.txt"), "x\n")
+      System.cmd("git", ["add", "staged.txt"], cd: tmp_dir)
+
+      {staged, 0} = System.cmd("git", ["status", "--porcelain"], cd: tmp_dir)
+      assert String.contains?(staged, "A  staged.txt")
+
+      assert {:ok, :done} = Git.reset(files: ["staged.txt"], config: config)
+
+      {unstaged, 0} = System.cmd("git", ["status", "--porcelain"], cd: tmp_dir)
+      assert String.contains?(unstaged, "?? staged.txt")
+    end
   end
 
   describe "git reset --mixed (default)" do
