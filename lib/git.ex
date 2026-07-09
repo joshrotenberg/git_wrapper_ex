@@ -107,16 +107,29 @@ defmodule Git do
   @doc """
   Runs `git status` and returns the parsed output.
 
+  The output always uses `--porcelain=v1 -b` so the parser keeps working. The
+  options below add flags on top of that base.
+
   ## Options
 
     * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:untracked_files` - `:no`, `:normal`, or `:all` to control how untracked
+      files are reported (`--untracked-files=<mode>`, default `nil`)
+    * `:ignored` - include ignored files (`--ignored`, default `false`)
+    * `:ignore_submodules` - when to ignore submodule changes, e.g. `"all"`
+      (`--ignore-submodules=<when>`, default `nil`)
+    * `:renames` - detect renames (`--renames`, default `false`)
+    * `:no_renames` - disable rename detection (`--no-renames`, default `false`)
+    * `:pathspec` - a list of paths to limit the status to, appended after a
+      `--` separator (default `[]`)
     * All other options are passed to the underlying command.
 
   """
   @spec status(keyword()) :: {:ok, Git.Status.t()} | {:error, term()}
   def status(opts \\ []) do
-    {config, _rest} = Keyword.pop(opts, :config, Config.new())
-    Git.Command.run(Git.Commands.Status, %Git.Commands.Status{}, config)
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.Status, rest)
+    Git.Command.run(Git.Commands.Status, command, config)
   end
 
   @doc """
