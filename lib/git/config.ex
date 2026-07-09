@@ -9,6 +9,11 @@ defmodule Git.Config do
   @default_timeout 30_000
   @default_runner :system_cmd
 
+  # Environment defaults applied to every git invocation, overridable via the
+  # `:env` config option. `GIT_TERMINAL_PROMPT=0` makes git fail fast instead of
+  # blocking on a credential prompt it can never receive under `System.cmd/3`.
+  @default_env [{"GIT_TERMINAL_PROMPT", "0"}]
+
   @typedoc """
   How git commands are executed.
 
@@ -82,27 +87,28 @@ defmodule Git.Config do
   @doc """
   Builds the options keyword list for `System.cmd/3`.
 
-  Includes `:cd`, `:env`, and `:stderr_to_stdout` based on the config.
+  Includes `:cd`, `:env`, and `:stderr_to_stdout` based on the config. The
+  environment always defaults `GIT_TERMINAL_PROMPT=0` so an auth-required
+  command fails fast instead of hanging on a credential prompt; entries in the
+  config's `:env` override the defaults on a key collision.
   """
   @spec cmd_opts(t()) :: keyword()
   def cmd_opts(%__MODULE__{} = config) do
-    opts = [stderr_to_stdout: true]
+    opts = [stderr_to_stdout: true, env: build_env(config)]
 
-    opts =
-      if config.working_dir do
-        Keyword.put(opts, :cd, config.working_dir)
-      else
-        opts
-      end
+    if config.working_dir do
+      Keyword.put(opts, :cd, config.working_dir)
+    else
+      opts
+    end
+  end
 
-    opts =
-      if config.env != [] do
-        Keyword.put(opts, :env, config.env)
-      else
-        opts
-      end
+  # Merges the config's `:env` over the defaults, so a caller can override any
+  # default (e.g. set GIT_TERMINAL_PROMPT back to "1") without duplicate keys.
+  defp build_env(%__MODULE__{env: env}) do
+    override_keys = Enum.map(env, fn {key, _value} -> key end)
 
-    opts
+    Enum.reject(@default_env, fn {key, _value} -> key in override_keys end) ++ env
   end
 
   @doc """
