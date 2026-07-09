@@ -2,26 +2,34 @@ defmodule Git.Commands.Reset do
   @moduledoc """
   Implements the `Git.Command` behaviour for `git reset`.
 
-  Supports `--soft`, `--mixed` (default), and `--hard` modes against any
-  git ref (defaults to `HEAD`).
+  Supports two forms:
+
+    * whole-tree reset, `git reset --<mode> <ref>`, with `:mode` one of
+      `:soft`, `:mixed` (default), `:hard`, `:merge`, or `:keep`
+    * pathspec reset, `git reset <ref> -- <paths>`, selected by giving `:files`.
+      This unstages the listed paths; `:mode` does not apply to this form (git
+      rejects a mode flag together with a pathspec).
   """
 
   @behaviour Git.Command
 
-  @type mode :: :soft | :mixed | :hard
+  @type mode :: :soft | :mixed | :hard | :merge | :keep
 
   @type t :: %__MODULE__{
           ref: String.t(),
-          mode: mode()
+          mode: mode(),
+          files: [String.t()],
+          quiet: boolean()
         }
 
-  defstruct ref: "HEAD", mode: :mixed
+  defstruct ref: "HEAD", mode: :mixed, files: [], quiet: false
 
   @doc """
   Returns the argument list for `git reset`.
 
-  Builds `git reset --<mode> <ref>` from the struct fields. The mode defaults
-  to `:mixed` and the ref defaults to `"HEAD"`.
+  With `:files`, builds the pathspec form `git reset [-q] <ref> -- <paths>`.
+  Otherwise builds the whole-tree form `git reset --<mode> [-q] <ref>`. The mode
+  defaults to `:mixed` and the ref defaults to `"HEAD"`.
 
   ## Examples
 
@@ -34,11 +42,21 @@ defmodule Git.Commands.Reset do
       iex> Git.Commands.Reset.args(%Git.Commands.Reset{mode: :hard})
       ["reset", "--hard", "HEAD"]
 
+      iex> Git.Commands.Reset.args(%Git.Commands.Reset{files: ["a.ex", "b.ex"]})
+      ["reset", "HEAD", "--", "a.ex", "b.ex"]
+
+      iex> Git.Commands.Reset.args(%Git.Commands.Reset{mode: :keep, quiet: true})
+      ["reset", "--keep", "-q", "HEAD"]
+
   """
   @spec args(t()) :: [String.t()]
   @impl true
-  def args(%__MODULE__{ref: ref, mode: mode}) do
-    ["reset", mode_flag(mode), ref]
+  def args(%__MODULE__{files: [_ | _] = files, ref: ref, quiet: quiet}) do
+    ["reset"] ++ quiet_flag(quiet) ++ [ref, "--"] ++ files
+  end
+
+  def args(%__MODULE__{ref: ref, mode: mode, quiet: quiet}) do
+    ["reset", mode_flag(mode)] ++ quiet_flag(quiet) ++ [ref]
   end
 
   @doc """
@@ -56,4 +74,9 @@ defmodule Git.Commands.Reset do
   defp mode_flag(:soft), do: "--soft"
   defp mode_flag(:mixed), do: "--mixed"
   defp mode_flag(:hard), do: "--hard"
+  defp mode_flag(:merge), do: "--merge"
+  defp mode_flag(:keep), do: "--keep"
+
+  defp quiet_flag(true), do: ["-q"]
+  defp quiet_flag(false), do: []
 end
