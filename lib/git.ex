@@ -136,18 +136,42 @@ defmodule Git do
   end
 
   @doc """
-  Runs `git commit` with the given message and returns the parsed output.
+  Runs `git commit` and returns the parsed output.
+
+  The message may be `nil` for message-less commits such as
+  `Git.commit(nil, amend: true, no_edit: true)` or when using `:file`.
 
   ## Options
 
     * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
-    * All other options are passed to the underlying command.
+    * `:all` - stage tracked changes before committing (`-a`, default `false`)
+    * `:amend` - amend the previous commit (default `false`)
+    * `:allow_empty` - allow a commit with no changes (default `false`)
+    * `:no_verify` - skip the pre-commit and commit-msg hooks (default `false`)
+    * `:no_edit` - reuse the existing message without opening an editor (default `false`)
+    * `:signoff` - add a `Signed-off-by` trailer (`-s`, default `false`)
+    * `:author` - override the author, `"Name <email>"` (default `nil`)
+    * `:date` - override the author date (default `nil`)
+    * `:fixup` - create a `fixup!` commit for the given commit (default `nil`)
+    * `:squash` - create a `squash!` commit for the given commit (default `nil`)
+    * `:file` - read the message from a file (`-F`, default `nil`)
+    * `:reuse_message` - reuse the message from the given commit (`-C`, default `nil`)
+    * `:cleanup` - message cleanup mode (default `nil`)
+    * `:only` - commit only the listed paths (`--only`, default `[]`)
+
+  ## Examples
+
+      Git.commit("feat: add thing")
+      Git.commit(nil, amend: true, no_edit: true)
+      Git.commit("chore: sign", signoff: true)
 
   """
-  @spec commit(String.t(), keyword()) :: {:ok, Git.CommitResult.t()} | {:error, term()}
-  def commit(message, opts \\ []) when is_binary(message) do
+  @spec commit(String.t() | nil, keyword()) ::
+          {:ok, Git.CommitResult.t()} | {:error, term()}
+  def commit(message \\ nil, opts \\ []) when is_binary(message) or is_nil(message) do
     {config, rest} = Keyword.pop(opts, :config, Config.new())
-    command = struct!(Git.Commands.Commit, [{:message, message} | rest])
+    fields = if is_nil(message), do: rest, else: Keyword.put(rest, :message, message)
+    command = struct!(Git.Commands.Commit, fields)
     Git.Command.run(Git.Commands.Commit, command, config)
   end
 

@@ -1,6 +1,7 @@
 defmodule Git.CommitTest do
   use ExUnit.Case, async: true
 
+  alias Git.Commands.Commit
   alias Git.CommitResult
   alias Git.Config
 
@@ -125,6 +126,92 @@ defmodule Git.CommitTest do
                )
 
       assert result.subject == "amended message"
+    end
+  end
+
+  describe "Git.Commands.Commit args/1" do
+    test "builds -m and -a (unchanged output)" do
+      assert Commit.args(%Commit{message: "test", all: true}) == ["commit", "-m", "test", "-a"]
+    end
+
+    test "omits -m for a message-less amend --no-edit" do
+      assert Commit.args(%Commit{amend: true, no_edit: true}) ==
+               ["commit", "--amend", "--no-edit"]
+    end
+
+    test "uses -F instead of -m when a file is given" do
+      assert Commit.args(%Commit{file: "/tmp/msg", message: "ignored"}) ==
+               ["commit", "-F", "/tmp/msg"]
+    end
+
+    test "emits value options" do
+      command = %Commit{message: "m", signoff: true, author: "A U <a@u>", date: "2020-01-01"}
+
+      assert Commit.args(command) ==
+               ["commit", "-m", "m", "--signoff", "--author", "A U <a@u>", "--date", "2020-01-01"]
+    end
+
+    test "emits --no-verify" do
+      assert Commit.args(%Commit{message: "m", no_verify: true}) ==
+               ["commit", "-m", "m", "--no-verify"]
+    end
+
+    test "emits --fixup without a message" do
+      assert Commit.args(%Commit{fixup: "HEAD~1"}) == ["commit", "--fixup", "HEAD~1"]
+    end
+
+    test "emits --only with a pathspec" do
+      assert Commit.args(%Commit{message: "m", only: ["a.ex", "b.ex"]}) ==
+               ["commit", "-m", "m", "--only", "--", "a.ex", "b.ex"]
+    end
+  end
+
+  describe "commit flags reach git" do
+    test "amend --no-edit keeps the previous message", %{tmp_dir: tmp_dir, config: config} do
+      File.write!(Path.join(tmp_dir, "f.txt"), "v1\n")
+      System.cmd("git", ["add", "f.txt"], cd: tmp_dir)
+      {:ok, _} = Git.commit("keep this subject", config: config)
+
+      File.write!(Path.join(tmp_dir, "f.txt"), "v2\n")
+      System.cmd("git", ["add", "f.txt"], cd: tmp_dir)
+
+      assert {:ok, %CommitResult{} = result} =
+               Git.commit(nil, config: config, amend: true, no_edit: true)
+
+      assert result.subject == "keep this subject"
+    end
+
+    test "no_verify skips a failing pre-commit hook", %{tmp_dir: tmp_dir, config: config} do
+      # Use a repo-local hooksPath so this is deterministic regardless of any
+      # global core.hooksPath on the machine running the test.
+      hooks_dir = Path.join(tmp_dir, "hooks")
+      File.mkdir_p!(hooks_dir)
+      hook = Path.join(hooks_dir, "pre-commit")
+      File.write!(hook, "#!/bin/sh\nexit 1\n")
+      File.chmod!(hook, 0o755)
+      System.cmd("git", ["config", "core.hooksPath", hooks_dir], cd: tmp_dir)
+
+      File.write!(Path.join(tmp_dir, "g.txt"), "x\n")
+      System.cmd("git", ["add", "g.txt"], cd: tmp_dir)
+
+      # the hook rejects a normal commit
+      assert {:error, _} = Git.commit("blocked", config: config)
+      # but --no-verify bypasses it
+      assert {:ok, %CommitResult{}} = Git.commit("bypassed", config: config, no_verify: true)
+    end
+
+    test "author overrides the recorded author", %{tmp_dir: tmp_dir, config: config} do
+      File.write!(Path.join(tmp_dir, "h.txt"), "x\n")
+      System.cmd("git", ["add", "h.txt"], cd: tmp_dir)
+
+      assert {:ok, _} =
+               Git.commit("with author",
+                 config: config,
+                 author: "Custom Author <custom@example.com>"
+               )
+
+      {out, 0} = System.cmd("git", ["log", "-1", "--format=%an <%ae>"], cd: tmp_dir)
+      assert String.trim(out) == "Custom Author <custom@example.com>"
     end
   end
 
