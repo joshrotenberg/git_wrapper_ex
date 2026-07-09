@@ -12,7 +12,7 @@ defmodule Git.Commands.Push do
           remote: String.t() | nil,
           branch: String.t() | nil,
           force: boolean(),
-          force_with_lease: boolean(),
+          force_with_lease: boolean() | String.t(),
           set_upstream: boolean(),
           tags: boolean(),
           delete: boolean(),
@@ -20,7 +20,10 @@ defmodule Git.Commands.Push do
           all: boolean(),
           no_verify: boolean(),
           atomic: boolean(),
-          prune: boolean()
+          prune: boolean(),
+          follow_tags: boolean(),
+          push_option: [String.t()],
+          signed: boolean()
         }
 
   defstruct remote: nil,
@@ -34,7 +37,10 @@ defmodule Git.Commands.Push do
             all: false,
             no_verify: false,
             atomic: false,
-            prune: false
+            prune: false,
+            follow_tags: false,
+            push_option: [],
+            signed: false
 
   @doc """
   Returns the argument list for `git push`.
@@ -57,6 +63,12 @@ defmodule Git.Commands.Push do
       iex> Git.Commands.Push.args(%Git.Commands.Push{force: true, tags: true})
       ["push", "--force", "--tags"]
 
+      iex> Git.Commands.Push.args(%Git.Commands.Push{force_with_lease: "main:abc123"})
+      ["push", "--force-with-lease=main:abc123"]
+
+      iex> Git.Commands.Push.args(%Git.Commands.Push{push_option: ["ci.skip", "notify"]})
+      ["push", "--push-option", "ci.skip", "--push-option", "notify"]
+
   """
   @spec args(t()) :: [String.t()]
   @impl true
@@ -64,7 +76,7 @@ defmodule Git.Commands.Push do
     flags =
       ["push"]
       |> maybe_add(command.force, "--force")
-      |> maybe_add(command.force_with_lease, "--force-with-lease")
+      |> maybe_add_force_with_lease(command.force_with_lease)
       |> maybe_add(command.set_upstream, "-u")
       |> maybe_add(command.tags, "--tags")
       |> maybe_add(command.delete, "--delete")
@@ -73,6 +85,9 @@ defmodule Git.Commands.Push do
       |> maybe_add(command.no_verify, "--no-verify")
       |> maybe_add(command.atomic, "--atomic")
       |> maybe_add(command.prune, "--prune")
+      |> maybe_add(command.follow_tags, "--follow-tags")
+      |> maybe_add(command.signed, "--signed")
+      |> maybe_add_push_options(command.push_option)
 
     positional =
       []
@@ -96,6 +111,16 @@ defmodule Git.Commands.Push do
 
   defp maybe_add(args, true, flag), do: args ++ [flag]
   defp maybe_add(args, false, _flag), do: args
+
+  defp maybe_add_force_with_lease(args, false), do: args
+  defp maybe_add_force_with_lease(args, true), do: args ++ ["--force-with-lease"]
+
+  defp maybe_add_force_with_lease(args, value) when is_binary(value),
+    do: args ++ ["--force-with-lease=" <> value]
+
+  defp maybe_add_push_options(args, options) when is_list(options) do
+    Enum.reduce(options, args, fn option, acc -> acc ++ ["--push-option", option] end)
+  end
 
   defp maybe_add_value(args, nil), do: args
   defp maybe_add_value(args, value) when is_binary(value), do: args ++ [value]

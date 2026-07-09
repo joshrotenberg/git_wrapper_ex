@@ -438,7 +438,8 @@ defmodule Git do
     * `:remote` - remote name (e.g., `"origin"`)
     * `:branch` - branch or refspec to push
     * `:force` - force push (`--force`)
-    * `:force_with_lease` - safer force push (`--force-with-lease`)
+    * `:force_with_lease` - safer force push; `true` emits `--force-with-lease`,
+      a string emits `--force-with-lease=<value>` (e.g. `"main:abc123"`)
     * `:set_upstream` - set upstream tracking (`-u`)
     * `:tags` - push tags (`--tags`)
     * `:delete` - delete remote branch (`--delete`)
@@ -447,12 +448,19 @@ defmodule Git do
     * `:no_verify` - skip pre-push hooks (`--no-verify`)
     * `:atomic` - atomic push (`--atomic`)
     * `:prune` - prune remote branches (`--prune`)
+    * `:follow_tags` - push annotated tags reachable from the pushed refs
+      (`--follow-tags`)
+    * `:signed` - GPG-sign the push (`--signed`)
+    * `:push_option` - list of strings, each emitted as `--push-option <value>`
+      (default `[]`)
 
   ## Examples
 
       Git.push(remote: "origin", branch: "main")
       Git.push(remote: "origin", branch: "main", force_with_lease: true)
+      Git.push(remote: "origin", branch: "main", force_with_lease: "main:abc123")
       Git.push(tags: true)
+      Git.push(remote: "origin", branch: "main", push_option: ["ci.skip"])
 
   """
   @spec push(keyword()) :: {:ok, :done} | {:error, term()}
