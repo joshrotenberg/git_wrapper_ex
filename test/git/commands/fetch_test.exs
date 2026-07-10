@@ -22,6 +22,11 @@ defmodule Git.Commands.FetchTest do
                ["fetch", "origin", "main"]
     end
 
+    test "appends refspecs after the remote" do
+      assert Fetch.args(%Fetch{remote: "origin", refspecs: ["+main:refs/remotes/origin/main"]}) ==
+               ["fetch", "origin", "+main:refs/remotes/origin/main"]
+    end
+
     test "adds --all flag" do
       assert Fetch.args(%Fetch{all: true}) == ["fetch", "--all"]
     end

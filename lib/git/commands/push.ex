@@ -23,7 +23,8 @@ defmodule Git.Commands.Push do
           prune: boolean(),
           follow_tags: boolean(),
           push_option: [String.t()],
-          signed: boolean()
+          signed: boolean(),
+          refspecs: [String.t()]
         }
 
   defstruct remote: nil,
@@ -40,7 +41,8 @@ defmodule Git.Commands.Push do
             prune: false,
             follow_tags: false,
             push_option: [],
-            signed: false
+            signed: false,
+            refspecs: []
 
   @doc """
   Returns the argument list for `git push`.
@@ -69,6 +71,9 @@ defmodule Git.Commands.Push do
       iex> Git.Commands.Push.args(%Git.Commands.Push{push_option: ["ci.skip", "notify"]})
       ["push", "--push-option", "ci.skip", "--push-option", "notify"]
 
+      iex> Git.Commands.Push.args(%Git.Commands.Push{remote: "origin", refspecs: ["main:release"]})
+      ["push", "origin", "main:release"]
+
   """
   @spec args(t()) :: [String.t()]
   @impl true
@@ -93,6 +98,7 @@ defmodule Git.Commands.Push do
       []
       |> maybe_add_value(command.remote)
       |> maybe_add_value(command.branch)
+      |> Kernel.++(command.refspecs)
 
     flags ++ positional
   end

@@ -108,6 +108,16 @@ defmodule Git.Commands.PushTest do
                branch: "feature"
              }) == ["push", "--force", "-u", "--dry-run", "origin", "feature"]
     end
+
+    test "appends refspecs after the remote" do
+      assert Push.args(%Push{remote: "origin", refspecs: ["main:release"]}) ==
+               ["push", "origin", "main:release"]
+    end
+
+    test "supports force and delete refspecs" do
+      assert Push.args(%Push{remote: "origin", refspecs: ["+src:dst", ":stale"]}) ==
+               ["push", "origin", "+src:dst", ":stale"]
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -196,6 +206,21 @@ defmodule Git.Commands.PushTest do
                  %Push{remote: "origin", branch: "main", set_upstream: true},
                  config
                )
+    end
+
+    test "a refspec pushes to a renamed remote branch and can delete it", %{
+      config: config,
+      remote_dir: remote_dir
+    } do
+      assert {:ok, :done} = Git.push(remote: "origin", refspecs: ["main:renamed"], config: config)
+
+      {refs, 0} = System.cmd("git", ["show-ref", "--heads"], cd: remote_dir)
+      assert refs =~ "refs/heads/renamed"
+
+      assert {:ok, :done} = Git.push(remote: "origin", refspecs: [":renamed"], config: config)
+
+      {refs_after, _code} = System.cmd("git", ["show-ref", "--heads"], cd: remote_dir)
+      refute refs_after =~ "refs/heads/renamed"
     end
 
     test "push with --dry-run does not actually push", %{
