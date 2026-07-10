@@ -50,6 +50,55 @@ defmodule Git.ConflictsTest do
     System.cmd("git", ["merge", "conflict-branch"], cd: tmp_dir, env: @git_env)
   end
 
+  # Creates a cherry-pick conflict: `feat` and main change shared.txt
+  # differently, so cherry-picking feat onto main conflicts.
+  defp create_cherry_pick_conflict(tmp_dir) do
+    System.cmd("git", ["checkout", "-b", "feat"], cd: tmp_dir)
+    File.write!(Path.join(tmp_dir, "shared.txt"), "feat version")
+    System.cmd("git", ["add", "shared.txt"], cd: tmp_dir)
+    System.cmd("git", ["commit", "-m", "feat change"], cd: tmp_dir, env: @git_env)
+
+    System.cmd("git", ["checkout", "main"], cd: tmp_dir)
+    File.write!(Path.join(tmp_dir, "shared.txt"), "main version")
+    System.cmd("git", ["add", "shared.txt"], cd: tmp_dir)
+    System.cmd("git", ["commit", "-m", "main change"], cd: tmp_dir, env: @git_env)
+
+    System.cmd("git", ["cherry-pick", "feat"], cd: tmp_dir, env: @git_env)
+  end
+
+  # Creates a rebase conflict: `topic` and main change the same line, so
+  # rebasing topic onto main conflicts while replaying topic's commit.
+  defp create_rebase_conflict(tmp_dir) do
+    System.cmd("git", ["checkout", "-b", "topic"], cd: tmp_dir)
+    File.write!(Path.join(tmp_dir, "shared.txt"), "topic version")
+    System.cmd("git", ["add", "shared.txt"], cd: tmp_dir)
+    System.cmd("git", ["commit", "-m", "topic change"], cd: tmp_dir, env: @git_env)
+
+    System.cmd("git", ["checkout", "main"], cd: tmp_dir)
+    File.write!(Path.join(tmp_dir, "shared.txt"), "main version")
+    System.cmd("git", ["add", "shared.txt"], cd: tmp_dir)
+    System.cmd("git", ["commit", "-m", "main change"], cd: tmp_dir, env: @git_env)
+
+    System.cmd("git", ["checkout", "topic"], cd: tmp_dir)
+    System.cmd("git", ["rebase", "main"], cd: tmp_dir, env: @git_env)
+  end
+
+  # Creates a revert conflict: a commit changes shared.txt, a later commit
+  # changes the same line again, so reverting the first conflicts with the
+  # second.
+  defp create_revert_conflict(tmp_dir) do
+    File.write!(Path.join(tmp_dir, "shared.txt"), "second version")
+    System.cmd("git", ["add", "shared.txt"], cd: tmp_dir)
+    System.cmd("git", ["commit", "-m", "second"], cd: tmp_dir, env: @git_env)
+
+    File.write!(Path.join(tmp_dir, "shared.txt"), "third version")
+    System.cmd("git", ["add", "shared.txt"], cd: tmp_dir)
+    System.cmd("git", ["commit", "-m", "third"], cd: tmp_dir, env: @git_env)
+
+    {sha, 0} = System.cmd("git", ["rev-parse", "HEAD~1"], cd: tmp_dir)
+    System.cmd("git", ["revert", String.trim(sha)], cd: tmp_dir, env: @git_env)
+  end
+
   describe "detect/1" do
     test "returns false when no conflicts exist", %{config: config} do
       assert {:ok, false} = Git.Conflicts.detect(config: config)
@@ -231,6 +280,152 @@ defmodule Git.ConflictsTest do
       # Working tree holds their (branch) version and the conflict is resolved.
       assert File.read!(Path.join(tmp_dir, "shared.txt")) == "branch version"
       assert {:ok, true} = Git.Conflicts.resolved?(config: config)
+    end
+  end
+
+  describe "resolve/2" do
+    test "using: :ours keeps our side and stages it", %{tmp_dir: tmp_dir, config: config} do
+      create_conflict(tmp_dir)
+
+      assert {:ok, :done} = Git.Conflicts.resolve("shared.txt", using: :ours, config: config)
+      assert File.read!(Path.join(tmp_dir, "shared.txt")) == "main version"
+      assert {:ok, true} = Git.Conflicts.resolved?(config: config)
+    end
+
+    test "using: :theirs keeps their side and stages it", %{tmp_dir: tmp_dir, config: config} do
+      create_conflict(tmp_dir)
+
+      assert {:ok, :done} = Git.Conflicts.resolve("shared.txt", using: :theirs, config: config)
+      assert File.read!(Path.join(tmp_dir, "shared.txt")) == "branch version"
+      assert {:ok, true} = Git.Conflicts.resolved?(config: config)
+    end
+
+    test "accepts a list of paths", %{tmp_dir: tmp_dir, config: config} do
+      File.write!(Path.join(tmp_dir, "other.txt"), "initial other")
+      System.cmd("git", ["add", "other.txt"], cd: tmp_dir)
+      System.cmd("git", ["commit", "-m", "add other"], cd: tmp_dir, env: @git_env)
+
+      System.cmd("git", ["checkout", "-b", "multi"], cd: tmp_dir)
+      File.write!(Path.join(tmp_dir, "shared.txt"), "branch shared")
+      File.write!(Path.join(tmp_dir, "other.txt"), "branch other")
+      System.cmd("git", ["add", "."], cd: tmp_dir)
+      System.cmd("git", ["commit", "-m", "branch changes"], cd: tmp_dir, env: @git_env)
+
+      System.cmd("git", ["checkout", "main"], cd: tmp_dir)
+      File.write!(Path.join(tmp_dir, "shared.txt"), "main shared")
+      File.write!(Path.join(tmp_dir, "other.txt"), "main other")
+      System.cmd("git", ["add", "."], cd: tmp_dir)
+      System.cmd("git", ["commit", "-m", "main changes"], cd: tmp_dir, env: @git_env)
+
+      System.cmd("git", ["merge", "multi"], cd: tmp_dir, env: @git_env)
+
+      assert {:ok, :done} =
+               Git.Conflicts.resolve(["shared.txt", "other.txt"], using: :theirs, config: config)
+
+      assert File.read!(Path.join(tmp_dir, "shared.txt")) == "branch shared"
+      assert File.read!(Path.join(tmp_dir, "other.txt")) == "branch other"
+      assert {:ok, true} = Git.Conflicts.resolved?(config: config)
+    end
+
+    test "returns an error for an unknown strategy", %{config: config} do
+      assert {:error, {:invalid_strategy, :bogus}} =
+               Git.Conflicts.resolve("shared.txt", using: :bogus, config: config)
+    end
+
+    test "returns an error when :using is missing", %{config: config} do
+      assert {:error, {:invalid_strategy, nil}} =
+               Git.Conflicts.resolve("shared.txt", config: config)
+    end
+  end
+
+  describe "abort/1" do
+    test "aborts an in-progress merge", %{tmp_dir: tmp_dir, config: config} do
+      create_conflict(tmp_dir)
+
+      assert {:ok, true} = Git.Conflicts.detect(config: config)
+      assert {:ok, :done} = Git.Conflicts.abort(config: config)
+      assert File.read!(Path.join(tmp_dir, "shared.txt")) == "main version"
+      assert {:ok, false} = Git.Conflicts.detect(config: config)
+    end
+
+    test "aborts an in-progress cherry-pick", %{tmp_dir: tmp_dir, config: config} do
+      create_cherry_pick_conflict(tmp_dir)
+
+      assert {:ok, true} = Git.Conflicts.detect(config: config)
+      assert {:ok, :done} = Git.Conflicts.abort(config: config)
+      assert {:ok, false} = Git.Conflicts.detect(config: config)
+      refute File.exists?(Path.join([tmp_dir, ".git", "CHERRY_PICK_HEAD"]))
+    end
+
+    test "aborts an in-progress rebase", %{tmp_dir: tmp_dir, config: config} do
+      create_rebase_conflict(tmp_dir)
+
+      assert {:ok, true} = Git.Conflicts.detect(config: config)
+      assert {:ok, :done} = Git.Conflicts.abort(config: config)
+      assert {:ok, false} = Git.Conflicts.detect(config: config)
+      refute File.dir?(Path.join([tmp_dir, ".git", "rebase-merge"]))
+    end
+
+    test "aborts an in-progress revert", %{tmp_dir: tmp_dir, config: config} do
+      create_revert_conflict(tmp_dir)
+
+      assert {:ok, true} = Git.Conflicts.detect(config: config)
+      assert {:ok, :done} = Git.Conflicts.abort(config: config)
+      assert {:ok, false} = Git.Conflicts.detect(config: config)
+      refute File.exists?(Path.join([tmp_dir, ".git", "REVERT_HEAD"]))
+    end
+
+    test "returns an error when no operation is in progress", %{config: config} do
+      assert {:error, :no_operation_in_progress} = Git.Conflicts.abort(config: config)
+    end
+  end
+
+  describe "continue/1" do
+    test "concludes a resolved merge with a merge commit", %{tmp_dir: tmp_dir, config: config} do
+      create_conflict(tmp_dir)
+
+      assert {:ok, :done} = Git.Conflicts.resolve("shared.txt", using: :ours, config: config)
+      assert {:ok, %Git.CommitResult{}} = Git.Conflicts.continue(config: config)
+      assert {:ok, false} = Git.Conflicts.detect(config: config)
+      refute File.exists?(Path.join([tmp_dir, ".git", "MERGE_HEAD"]))
+
+      # The concluded commit is a real merge commit with two parents.
+      {parents, 0} = System.cmd("git", ["log", "-1", "--pretty=%P"], cd: tmp_dir)
+      assert length(String.split(String.trim(parents))) == 2
+    end
+
+    test "continues a cherry-pick after resolution", %{tmp_dir: tmp_dir, config: config} do
+      create_cherry_pick_conflict(tmp_dir)
+
+      # Resolve to their side so the concluded commit is non-empty.
+      assert {:ok, :done} = Git.Conflicts.resolve("shared.txt", using: :theirs, config: config)
+      assert {:ok, :done} = Git.Conflicts.continue(config: config)
+      assert {:ok, false} = Git.Conflicts.detect(config: config)
+      refute File.exists?(Path.join([tmp_dir, ".git", "CHERRY_PICK_HEAD"]))
+      assert File.read!(Path.join(tmp_dir, "shared.txt")) == "feat version"
+    end
+
+    test "continues a rebase after resolution", %{tmp_dir: tmp_dir, config: config} do
+      create_rebase_conflict(tmp_dir)
+
+      assert {:ok, :done} = Git.Conflicts.resolve("shared.txt", using: :theirs, config: config)
+      assert {:ok, :done} = Git.Conflicts.continue(config: config)
+      assert {:ok, false} = Git.Conflicts.detect(config: config)
+      refute File.dir?(Path.join([tmp_dir, ".git", "rebase-merge"]))
+      assert File.read!(Path.join(tmp_dir, "shared.txt")) == "topic version"
+    end
+
+    test "continues a revert after resolution", %{tmp_dir: tmp_dir, config: config} do
+      create_revert_conflict(tmp_dir)
+
+      assert {:ok, :done} = Git.Conflicts.resolve("shared.txt", using: :theirs, config: config)
+      assert {:ok, :done} = Git.Conflicts.continue(config: config)
+      assert {:ok, false} = Git.Conflicts.detect(config: config)
+      refute File.exists?(Path.join([tmp_dir, ".git", "REVERT_HEAD"]))
+    end
+
+    test "returns an error when no operation is in progress", %{config: config} do
+      assert {:error, :no_operation_in_progress} = Git.Conflicts.continue(config: config)
     end
   end
 end
