@@ -1,8 +1,9 @@
 defmodule Git.Runner.SystemCmd do
   @moduledoc """
-  Default runner backed by `System.cmd/3`.
+  Fallback runner backed by `System.cmd/3`.
 
-  Runs git under a `Task` and bounds it with `Task.yield/2` plus
+  Used when the optional `:forcola` dependency is unavailable or on non-POSIX
+  platforms. Runs git under a `Task` and bounds it with `Task.yield/2` plus
   `Task.shutdown/1`. This is the historical behavior of this library and needs
   no extra dependencies.
 

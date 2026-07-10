@@ -3,22 +3,26 @@ defmodule Git.Runner do
   Behaviour describing how git commands are executed.
 
   `Git.Command.run/3` dispatches every git invocation through a runner. The
-  default is `Git.Runner.SystemCmd`, which uses `System.cmd/3` and matches the
-  historical behavior of this library: no extra dependencies, works on every
-  platform.
+  default is `Git.Runner.Forcola`, which runs git in its own process group and
+  kills the whole group on timeout, so a timed-out command and its children do
+  not leak. It requires the optional [forcola](https://hex.pm/packages/forcola)
+  dependency and a supported platform (macOS or Linux), and falls back to
+  `Git.Runner.SystemCmd` when forcola is unavailable (for example on Windows or
+  when the dependency is not installed).
 
-  For leak-free execution, add [forcola](https://hex.pm/packages/forcola) to
-  your dependencies and select the forcola runner via `Git.Config`:
+  `Git.Runner.SystemCmd` uses `System.cmd/3`: no extra dependencies, works on
+  every platform, but a timed-out command abandons the OS process rather than
+  killing it. To force it explicitly:
 
-      config = Git.Config.new(runner: :forcola)
+      config = Git.Config.new(runner: :system_cmd)
       {:ok, status} = Git.status(config: config)
 
   `System.cmd/3` implements timeouts by closing the Erlang port, which only
   closes pipes and never signals the OS process. A timed-out git command, and
   anything it spawned (ssh transports, credential helpers, hooks, sign
-  helpers), keeps running and can hold repository locks. `Git.Runner.Forcola`
-  runs git in its own process group and kills the whole group on timeout, so a
-  `{:error, :timeout}` means git is actually gone.
+  helpers), keeps running and can hold repository locks. That leak is why
+  `Git.Runner.Forcola` is the default: it kills the whole process group on
+  timeout, so a `{:error, :timeout}` means git is actually gone.
 
   See `Git.Config` for the accepted `:runner` values.
 

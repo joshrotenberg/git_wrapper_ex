@@ -6,9 +6,9 @@
 
 A clean Elixir wrapper for the git CLI. Provides a direct, idiomatic mapping
 to git subcommands with fully parsed output structs and higher-level workflow
-abstractions. Runs git through `System.cmd/3` by default, with an optional
-leak-free runner for group-kill on timeout (see
-[Execution and timeouts](#execution-and-timeouts)).
+abstractions. Runs git through a leak-free runner by default that kills the
+whole process group on timeout, and falls back to `System.cmd/3` where that
+runner is unavailable (see [Execution and timeouts](#execution-and-timeouts)).
 
 ## Installation
 
@@ -17,7 +17,7 @@ Add `git` to your dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:git, "~> 0.4.0"}
+    {:git, "~> 0.6"}
   ]
 end
 ```
@@ -48,54 +48,89 @@ Enum.each(commits, fn c -> IO.puts("#{c.abbreviated_hash}  #{c.subject}") end)
 ## Configuration
 
 Pass a `Git.Config` struct via the `:config` option to control the working
-directory, git binary path, environment variables, or timeout:
+directory, git binary path, environment variables, timeout, runner, and
+per-invocation config:
 
 ```elixir
 config = Git.Config.new(
   working_dir: "/path/to/repo",
-  timeout: 60_000
+  timeout: 60_000,
+  runner: :forcola,
+  extra_config: [{"core.autocrlf", "false"}]
 )
 
 {:ok, status} = Git.status(config: config)
 ```
 
+- `:runner` selects how git is executed: `:forcola` (the default, leak-free),
+  `:system_cmd`, or any module implementing the `Git.Runner` behaviour. See
+  [Execution and timeouts](#execution-and-timeouts).
+- `:extra_config` is a list of `{key, value}` pairs emitted as `git -c
+  key=value` on every invocation, so you can override config without touching
+  the repository's `.git/config`.
+
+### Identity, dates, and a scratch index
+
+Author/committer identity, commit dates, and the index file are set through
+`:env` and `:extra_config` (git reads them from the environment and
+per-invocation config) rather than dedicated options:
+
+```elixir
+# Set identity without mutating repo config
+Git.Config.new(extra_config: [
+  {"user.name", "A U Thor"},
+  {"user.email", "author@example.com"}
+])
+
+# Pin author and committer dates (commit --date sets only the author date)
+Git.Config.new(env: [
+  {"GIT_AUTHOR_DATE", "2020-01-01T00:00:00"},
+  {"GIT_COMMITTER_DATE", "2020-01-01T00:00:00"}
+])
+
+# Build a commit off to the side against a scratch index
+Git.Config.new(env: [{"GIT_INDEX_FILE", "/tmp/scratch.index"}])
+```
+
 ## Execution and timeouts
 
 Every git command runs through a `Git.Runner`. The default,
-`Git.Runner.SystemCmd`, uses `System.cmd/3` and works everywhere with no extra
-dependencies.
-
-`System.cmd/3` implements timeouts by closing the Erlang port, which only
-closes the stdin/stdout pipes and never signals the git OS process. A git
-command that times out, and anything git spawned (ssh transports, credential
-helpers, hooks, sign helpers), can keep running and hold repository locks such
-as `.git/index.lock`.
-
-For leak-free execution, add the optional
-[forcola](https://hex.pm/packages/forcola) dependency and select the forcola
-runner. It runs git in its own process group and kills the whole group
-(SIGTERM then SIGKILL) on timeout or BEAM death, so a `{:error, :timeout}`
+`Git.Runner.Forcola`, runs git in its own process group and kills the whole
+group (SIGTERM then SIGKILL) on timeout or BEAM death, so a `{:error, :timeout}`
 means git is actually gone.
+
+This matters because `System.cmd/3` implements timeouts by closing the Erlang
+port, which only closes the stdin/stdout pipes and never signals the git OS
+process. Under that model a git command that times out, and anything git
+spawned (ssh transports, credential helpers, hooks, sign helpers), can keep
+running and hold repository locks such as `.git/index.lock`. The forcola runner
+exists to close that gap, so it is the default.
+
+forcola is an optional dependency. It is POSIX-only (macOS and Linux) and ships
+precompiled shim binaries, so no Rust toolchain is required on its supported
+targets. Add it to your dependencies to get the leak-free default:
 
 ```elixir
 # mix.exs
 {:forcola, "~> 0.3"}
 ```
 
+When forcola is not installed, or on a platform it does not support (for
+example Windows), the runner falls back to `Git.Runner.SystemCmd`, which uses
+`System.cmd/3` and works everywhere with no extra dependencies. To select it
+explicitly:
+
 ```elixir
-config = Git.Config.new(runner: :forcola)
+config = Git.Config.new(runner: :system_cmd)
 {:ok, status} = Git.status(config: config)
 ```
 
-forcola is POSIX-only (macOS and Linux) and ships precompiled shim binaries,
-so no Rust toolchain is required on its supported targets. When forcola is not
-installed, `runner: :forcola` falls back to the default `System.cmd/3` runner.
 The `:runner` value may also be any module implementing the `Git.Runner`
 behaviour.
 
 ## Commands
 
-65 git commands with full option support and parsed output.
+80 git commands with full option support and parsed output.
 
 ### Core (snapshotting, branching, sharing)
 
@@ -143,6 +178,11 @@ behaviour.
 | `ls_files/1` | `git ls-files` | `[String.t()]` |
 | `ls_remote/1` | `git ls-remote` | `[Git.LsRemoteEntry.t()]` |
 | `ls_tree/1` | `git ls-tree` | `[Git.TreeEntry.t()]` |
+| `version/1` | `git version` | `Git.Version.t()` |
+| `count_objects/1` | `git count-objects` | `Git.CountObjects.t()` |
+| `var/1` | `git var` | `map()` or `String.t()` |
+| `name_rev/1` | `git name-rev` | `String.t()` |
+| `check_ref_format/1` | `git check-ref-format` | `true` or `String.t()` |
 
 ### Patching and email
 
@@ -172,6 +212,7 @@ behaviour.
 | `verify_commit/2` | `git verify-commit` | `map()` |
 | `verify_tag/2` | `git verify-tag` | `map()` |
 | `check_ignore/1` | `git check-ignore` | `[String.t()]` or `[map()]` |
+| `check_attr/1` | `git check-attr` | `[map()]` |
 
 ### Plumbing
 
@@ -179,6 +220,15 @@ behaviour.
 |---|---|---|
 | `cat_file/2` | `git cat-file` | varies |
 | `commit_tree/1` | `git commit-tree` | `String.t()` |
+| `write_tree/1` | `git write-tree` | `String.t()` |
+| `read_tree/1` | `git read-tree` | `:done` |
+| `update_index/1` | `git update-index` | `:done` |
+| `mktree/1` | `git mktree` | `String.t()` |
+| `merge_tree/3` | `git merge-tree` | `Git.MergeTreeResult.t()` |
+| `merge_file/4` | `git merge-file` | `non_neg_integer()` |
+| `diff_tree/1` | `git diff-tree` | `[Git.DiffRawEntry.t()]` |
+| `diff_index/1` | `git diff-index` | `[Git.DiffRawEntry.t()]` or `boolean()` |
+| `diff_files/1` | `git diff-files` | `[Git.DiffRawEntry.t()]` |
 | `for_each_ref/1` | `git for-each-ref` | `String.t()` |
 | `hash_object/1` | `git hash-object` | `String.t()` |
 | `symbolic_ref/1` | `git symbolic-ref` | `String.t()` or `:done` |
@@ -218,10 +268,25 @@ end)
 
 ### Git.Workflow
 
-Composable multi-step workflows:
+Composable multi-step workflows. Everyday commit helpers:
 
 ```elixir
-# Feature branch with automatic cleanup
+# Stage everything and commit in one call
+Git.Workflow.commit_all("fix: patch bug", config: config)
+
+# Amend the last commit; undo it (soft); squash the last N
+Git.Workflow.amend(config: config)
+Git.Workflow.undo_last_commit(config: config)
+Git.Workflow.squash_last(3, "feat: combined change", config: config)
+
+# Discard all uncommitted changes (tracked and untracked)
+Git.Workflow.discard_all(config: config)
+```
+
+Brackets and combinators (each threads `:config` and cleans up after itself):
+
+```elixir
+# Feature branch with automatic merge + cleanup
 Git.Workflow.feature_branch("feat/login", fn opts ->
   File.write!("login.ex", "...")
   {:ok, :done} = Git.add(Keyword.merge(opts, files: ["login.ex"]))
@@ -229,14 +294,41 @@ Git.Workflow.feature_branch("feat/login", fn opts ->
   {:ok, :done}
 end, merge: true, delete: true, config: config)
 
-# Stage everything and commit in one call
-Git.Workflow.commit_all("fix: patch bug", config: config)
+# Check out a ref, run a function, restore the original branch (even on raise)
+Git.Workflow.with_branch("main", fn opts -> Git.log(opts) end, config: config)
 
+# Stash, run a function, pop the stash
+Git.Workflow.with_stash(fn opts -> Git.pull(opts) end, config: config)
+
+# Run a runtime-built list of steps, short-circuiting on the first error
+[
+  {:stage, fn o -> Git.add(Keyword.merge(o, all: true)) end},
+  {:commit, fn o -> Git.commit("chore: release", o) end}
+]
+|> Git.Workflow.chain(config: config)
+```
+
+Integration, release, and collaboration:
+
+```elixir
 # Sync with upstream (fetch + rebase, with autostash)
 Git.Workflow.sync(config: config)
 
+# Rebase / merge that rolls back cleanly on conflict
+Git.Workflow.safe_rebase(config: config)
+Git.Workflow.try_merge("feature-branch", config: config)
+
 # Squash merge a branch
 Git.Workflow.squash_merge("feature-branch", message: "feat: all the things", config: config)
+
+# Cut a release, publish the current branch, sync a fork, backport commits
+Git.Workflow.release("v1.2.0", config: config)
+Git.Workflow.publish(config: config)
+Git.Workflow.sync_fork(config: config)
+Git.Workflow.backport(["abc1234"], config: config)
+
+# Recreate a branch that was deleted (from the reflog)
+Git.Workflow.restore_branch("feat/lost", config: config)
 ```
 
 ### Git.History
@@ -303,6 +395,12 @@ Branch management:
 {:ok, deleted} = Git.Branches.cleanup_merged(exclude: ["main", "develop"], config: config)
 {:ok, %{ahead: 3, behind: 0}} = Git.Branches.divergence("feat/x", "main", config: config)
 {:ok, recent} = Git.Branches.recent(count: 5, config: config)
+
+# Delete a branch; prune locals whose upstream is gone; find squash-merged branches
+{:ok, :done} = Git.Branches.delete_branch("feat/done", config: config)
+{:ok, pruned} = Git.Branches.prune_gone(config: config)
+{:ok, would_delete} = Git.Branches.delete_squashed(target: "main", config: config)  # dry-run by default
+{:ok, deleted} = Git.Branches.delete_squashed(target: "main", dry_run: false, config: config)
 ```
 
 ### Git.Tags
@@ -362,7 +460,20 @@ Merge conflict helpers:
 {:ok, false} = Git.Conflicts.detect(config: config)
 {:ok, files} = Git.Conflicts.files(config: config)
 {:ok, true} = Git.Conflicts.resolved?(config: config)
-{:ok, :done} = Git.Conflicts.abort_merge(config: config)
+
+# Inspect the three sides of a conflicted path
+{:ok, base} = Git.Conflicts.base("shared.txt", config: config)
+{:ok, ours} = Git.Conflicts.ours("shared.txt", config: config)
+{:ok, theirs} = Git.Conflicts.theirs("shared.txt", config: config)
+
+# Resolve by taking one side (single path or a list), then it is staged for you
+{:ok, :done} = Git.Conflicts.take_ours("shared.txt", config: config)
+{:ok, :done} = Git.Conflicts.take_theirs(["a.txt", "b.txt"], config: config)
+{:ok, :done} = Git.Conflicts.resolve("shared.txt", using: :ours, config: config)
+
+# Abort or continue whatever operation is in progress (merge/rebase/cherry-pick/revert)
+{:ok, :done} = Git.Conflicts.abort(config: config)
+{:ok, _} = Git.Conflicts.continue(config: config)
 ```
 
 ### Git.Hooks
@@ -375,6 +486,31 @@ Manage git hooks:
 {:ok, true} = Git.Hooks.enabled?("pre-commit", config: config)
 {:ok, _} = Git.Hooks.disable("pre-commit", config: config)
 :ok = Git.Hooks.remove("pre-commit", config: config)
+```
+
+### Git.Signing
+
+Configure commit and tag signing (sets the relevant git config keys):
+
+```elixir
+# SSH signing (sets gpg.format=ssh, user.signingkey, commit.gpgsign=true)
+{:ok, :done} = Git.Signing.use_ssh("/home/me/.ssh/id_ed25519.pub", config: config)
+
+# GPG signing by key id
+{:ok, :done} = Git.Signing.use_gpg("ABCD1234", config: config)
+
+# Also sign annotated tags by default
+{:ok, :done} = Git.Signing.sign_tags(true, config: config)
+```
+
+The actual signing happens when a commit, tag, or merge is created. Once the
+config above is set, `Git.commit/2`, `Git.tag/1`, and `Git.merge/2` sign
+automatically, or you can request it per call with `:sign` / `:gpg_sign` /
+`:local_user`:
+
+```elixir
+{:ok, _} = Git.commit("feat: signed change", sign: true, config: config)
+{:ok, :done} = Git.tag(create: "v1.0.0", message: "release", sign: true, config: config)
 ```
 
 ## License
