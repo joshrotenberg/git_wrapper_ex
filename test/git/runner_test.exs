@@ -39,8 +39,8 @@ defmodule Git.RunnerTest do
   end
 
   describe "Config default" do
-    test "runner defaults to :system_cmd" do
-      assert Config.new().runner == :system_cmd
+    test "runner defaults to :forcola" do
+      assert Config.new().runner == :forcola
     end
 
     test "runner is settable" do

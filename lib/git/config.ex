@@ -37,7 +37,7 @@ defmodule Git.Config do
   """
 
   @default_timeout 30_000
-  @default_runner :system_cmd
+  @default_runner :forcola
 
   # Environment defaults applied to every git invocation, overridable via the
   # `:env` config option. `GIT_TERMINAL_PROMPT=0` makes git fail fast instead of
@@ -47,10 +47,15 @@ defmodule Git.Config do
   @typedoc """
   How git commands are executed.
 
-    * `:system_cmd` - the default, `System.cmd/3` via `Git.Runner.SystemCmd`.
-    * `:forcola` - `Git.Runner.Forcola`, which kills the git process group on
-      timeout. Requires the optional `:forcola` dependency; falls back to
-      `:system_cmd` when it is not available.
+    * `:forcola` - the default, `Git.Runner.Forcola`, which runs git in its own
+      process group and kills the whole group on timeout, so a timed-out command
+      and its children (hooks, credential helpers, transports) do not leak.
+      Requires the optional `:forcola` dependency and a supported platform
+      (macOS or Linux); it falls back to `:system_cmd` when forcola is not
+      loaded (for example on Windows or when the dependency is absent).
+    * `:system_cmd` - `System.cmd/3` via `Git.Runner.SystemCmd`. No extra
+      dependency and works everywhere, but a timed-out command abandons the OS
+      process rather than killing it.
     * any module implementing the `Git.Runner` behaviour.
   """
   @type runner :: :system_cmd | :forcola | module()
