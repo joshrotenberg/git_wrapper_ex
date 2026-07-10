@@ -242,6 +242,85 @@ defmodule Git do
   end
 
   @doc """
+  Runs `git diff-tree` (raw plumbing) to compare two trees.
+
+  Emits `--raw -z` and parses each record into a `Git.DiffRawEntry`. With a
+  single tree-ish, diffs a commit against its first parent (the leading
+  commit-id header git prints is skipped).
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:tree_ish` - the first (or only) tree-ish to diff (default `"HEAD"`)
+    * `:tree_ish2` - a second tree-ish; when set, diffs `tree_ish tree_ish2`
+    * `:recursive` - recurse into subtrees (`-r`, default `false`)
+    * `:find_renames` - detect renames (`-M`, default `false`)
+
+  ## Examples
+
+      Git.diff_tree(tree_ish: "HEAD~1", tree_ish2: "HEAD", recursive: true)
+      Git.diff_tree(tree_ish: "HEAD")
+
+  """
+  @spec diff_tree(keyword()) :: {:ok, [Git.DiffRawEntry.t()]} | {:error, term()}
+  def diff_tree(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.DiffTree, rest)
+    Git.Command.run(Git.Commands.DiffTree, command, config)
+  end
+
+  @doc """
+  Runs `git diff-index` (raw plumbing) to compare a tree-ish to the index and
+  working tree.
+
+  In the default (raw) mode, emits `--raw -z` and returns
+  `{:ok, [Git.DiffRawEntry.t()]}`. With `:quiet`, runs as a dirty-check:
+  returns `{:ok, true}` when there are differences and `{:ok, false}` when
+  there are none.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:tree_ish` - the tree-ish to compare against (default `"HEAD"`)
+    * `:cached` - compare against the index only (`--cached`, default `false`)
+    * `:quiet` - dirty-check mode returning a boolean (`--quiet`, default `false`)
+
+  ## Examples
+
+      Git.diff_index(cached: true)
+      Git.diff_index(quiet: true)
+
+  """
+  @spec diff_index(keyword()) ::
+          {:ok, [Git.DiffRawEntry.t()] | boolean()} | {:error, term()}
+  def diff_index(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.DiffIndex, rest)
+    Git.Command.run(Git.Commands.DiffIndex, command, config)
+  end
+
+  @doc """
+  Runs `git diff-files` (raw plumbing) to compare the working tree to the index.
+
+  Emits `--raw -z` and returns `{:ok, [Git.DiffRawEntry.t()]}`.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+
+  ## Examples
+
+      Git.diff_files()
+
+  """
+  @spec diff_files(keyword()) :: {:ok, [Git.DiffRawEntry.t()]} | {:error, term()}
+  def diff_files(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.DiffFiles, rest)
+    Git.Command.run(Git.Commands.DiffFiles, command, config)
+  end
+
+  @doc """
   Runs `git remote` to list, add, or remove remotes.
 
   ## Options
@@ -388,6 +467,50 @@ defmodule Git do
     {config, rest} = Keyword.pop(opts, :config, Config.new())
     command = struct!(Git.Commands.Merge, [{:branch, branch} | rest])
     Git.Command.run(Git.Commands.Merge, command, config)
+  end
+
+  @doc """
+  Runs `git merge-file` to perform a scripted three-way merge of three files.
+
+  Incorporates the changes that lead from `base` to `other` into `current`,
+  writing the merged result (with conflict markers where the two sides overlap)
+  back into the `current` file. This works purely on files on disk; the index
+  and history are not touched.
+
+  Returns `{:ok, count}` where `count` is the number of conflicts (`0` for a
+  clean merge). A real error (bad option, missing file) returns
+  `{:error, {stdout, exit_code}}`.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:quiet` - do not warn about conflicts (`-q`, default `false`)
+    * `:ours` - resolve conflicts in favor of `current` (`--ours`, default `false`)
+    * `:theirs` - resolve conflicts in favor of `other` (`--theirs`, default `false`)
+    * `:union` - resolve conflicts by keeping both sides (`--union`, default `false`)
+    * `:diff3` - use a diff3-based merge with base markers (`--diff3`, default `false`)
+    * `:zdiff3` - use a zealous diff3-based merge (`--zdiff3`, default `false`)
+    * `:marker_size` - conflict marker length (`--marker-size`, default `nil`)
+    * `:labels` - up to three labels applied to `current`, `base`, `other`
+      conflict markers, in order (`-L`, default `[]`)
+
+  ## Examples
+
+      Git.merge_file("current.txt", "base.txt", "other.txt")
+      Git.merge_file("current.txt", "base.txt", "other.txt", ours: true)
+      Git.merge_file("current.txt", "base.txt", "other.txt", labels: ["ours", "base", "theirs"])
+
+  """
+  @spec merge_file(String.t(), String.t(), String.t(), keyword()) ::
+          {:ok, non_neg_integer()} | {:error, term()}
+  def merge_file(current, base, other, opts \\ [])
+      when is_binary(current) and is_binary(base) and is_binary(other) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+
+    command =
+      struct!(Git.Commands.MergeFile, [current: current, base: base, other: other] ++ rest)
+
+    Git.Command.run(Git.Commands.MergeFile, command, config)
   end
 
   @doc """
@@ -1438,6 +1561,38 @@ defmodule Git do
   end
 
   @doc """
+  Runs `git merge-tree --write-tree` to merge two commits in the object database.
+
+  Plumbing command. Performs a three-way merge of `branch1` and `branch2` with
+  no checkout, index, or working tree, and returns a `Git.MergeTreeResult` with
+  the merged tree SHA, whether the merge was clean, and any conflicted paths.
+  Useful for CI mergeability checks and server-side merges.
+
+  A merge with conflicts is returned as `{:ok, %Git.MergeTreeResult{clean:
+  false}}`, not an error. Requires git 2.38 or newer.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+
+  ## Examples
+
+      {:ok, result} = Git.merge_tree("main", "feature")
+      result.clean      #=> true
+      result.tree       #=> "5b12e6a..."
+      result.conflicts  #=> []
+
+  """
+  @spec merge_tree(String.t(), String.t(), keyword()) ::
+          {:ok, Git.MergeTreeResult.t()} | {:error, term()}
+  def merge_tree(branch1, branch2, opts \\ [])
+      when is_binary(branch1) and is_binary(branch2) do
+    {config, _rest} = Keyword.pop(opts, :config, Config.new())
+    command = %Git.Commands.MergeTree{branch1: branch1, branch2: branch2}
+    Git.Command.run(Git.Commands.MergeTree, command, config)
+  end
+
+  @doc """
   Runs `git cherry` to find commits not yet applied upstream.
 
   Returns a list of `Git.CherryEntry` structs. Each entry indicates
@@ -1593,6 +1748,40 @@ defmodule Git do
     {config, rest} = Keyword.pop(opts, :config, Config.new())
     command = struct!(Git.Commands.CheckIgnore, rest)
     Git.Command.run(Git.Commands.CheckIgnore, command, config)
+  end
+
+  @doc """
+  Runs `git check-attr` to report the gitattributes applied to paths.
+
+  This is the attributes analogue of `check_ignore/1`. Output is always
+  requested with `-z`, so paths and values containing spaces or newlines
+  parse unambiguously.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:attrs` - list of attribute names to query (required unless `:all`)
+    * `:paths` - list of paths to check (required)
+    * `:all` - report every attribute set on each path (`-a`); ignores `:attrs`
+    * `:cached` - read `.gitattributes` from the index, not the working tree
+
+  Returns `{:ok, [%{path: path, attr: attr, value: value}]}`. `value` is the
+  raw info string reported by git: one of `"set"`, `"unset"`, `"unspecified"`,
+  or a custom attribute value.
+
+  ## Examples
+
+      Git.check_attr(attrs: ["diff"], paths: ["src/main.ex"])
+      Git.check_attr(attrs: ["diff", "text"], paths: ["a.ex", "b.png"])
+      Git.check_attr(all: true, paths: ["src/main.ex"])
+
+  """
+  @spec check_attr(keyword()) ::
+          {:ok, [Git.Commands.CheckAttr.attribute()]} | {:error, term()}
+  def check_attr(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.CheckAttr, rest)
+    Git.Command.run(Git.Commands.CheckAttr, command, config)
   end
 
   @doc """
@@ -2187,6 +2376,34 @@ defmodule Git do
     {config, rest} = Keyword.pop(opts, :config, Config.new())
     command = struct!(Git.Commands.CommitTree, rest)
     Git.Command.run(Git.Commands.CommitTree, command, config)
+  end
+
+  @doc """
+  Runs `git write-tree` to record the current index as a tree object.
+
+  Plumbing command. Writes a tree object from the current index (the staged
+  content) and returns its SHA. This is the counterpart to `commit_tree/1`:
+  `write-tree` produces the tree SHA that `commit-tree` needs, so together they
+  build a commit without touching HEAD or the working tree.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:prefix` - write the tree for this subdirectory of the index (`--prefix`)
+    * `:missing_ok` - allow objects that are not in the object database
+      (`--missing-ok`, default `false`)
+
+  ## Examples
+
+      {:ok, tree} = Git.write_tree()
+      {:ok, tree} = Git.write_tree(prefix: "lib")
+
+  """
+  @spec write_tree(keyword()) :: {:ok, String.t()} | {:error, term()}
+  def write_tree(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.WriteTree, rest)
+    Git.Command.run(Git.Commands.WriteTree, command, config)
   end
 
   @doc """

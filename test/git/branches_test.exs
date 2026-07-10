@@ -60,6 +60,15 @@ defmodule Git.BranchesTest do
     )
   end
 
+  # Adds a bare remote to the setup repo and pushes main to it.
+  defp with_remote(tmp_dir) do
+    remote_dir = Path.join(tmp_dir, "remote.git")
+    System.cmd("git", ["init", "--bare", "--initial-branch=main", remote_dir])
+    System.cmd("git", ["remote", "add", "origin", remote_dir], cd: tmp_dir)
+    System.cmd("git", ["push", "-u", "origin", "main"], cd: tmp_dir)
+    remote_dir
+  end
+
   describe "create_and_checkout/2" do
     test "creates and switches to a new branch", %{config: config} do
       assert {:ok, checkout} = Git.Branches.create_and_checkout("feat/new", config: config)
@@ -252,6 +261,60 @@ defmodule Git.BranchesTest do
 
     test "returns error when renaming non-existent branch", %{config: config} do
       assert {:error, _} = Git.Branches.rename("nope", "also-nope", config: config)
+    end
+  end
+
+  describe "delete_branch/2" do
+    test "deletes only the local branch when no remote is given", %{
+      tmp_dir: tmp_dir,
+      config: config
+    } do
+      System.cmd("git", ["branch", "gone-local"], cd: tmp_dir)
+
+      assert {:ok, :done} = Git.Branches.delete_branch("gone-local", config: config)
+      assert {:ok, false} = Git.Branches.exists?("gone-local", config: config)
+    end
+
+    test "deletes the branch locally and on the remote", %{tmp_dir: tmp_dir, config: config} do
+      remote_dir = with_remote(tmp_dir)
+      System.cmd("git", ["branch", "feature"], cd: tmp_dir)
+      System.cmd("git", ["push", "origin", "feature"], cd: tmp_dir)
+
+      assert {:ok, :done} =
+               Git.Branches.delete_branch("feature", remote: "origin", config: config)
+
+      assert {:ok, false} = Git.Branches.exists?("feature", config: config)
+      {out, 0} = System.cmd("git", ["ls-remote", "--heads", remote_dir, "feature"], cd: tmp_dir)
+      assert out == ""
+    end
+  end
+
+  describe "prune_gone/1" do
+    test "deletes local branches whose upstream is gone", %{tmp_dir: tmp_dir, config: config} do
+      remote_dir = with_remote(tmp_dir)
+      System.cmd("git", ["checkout", "-b", "feature"], cd: tmp_dir)
+      System.cmd("git", ["push", "-u", "origin", "feature"], cd: tmp_dir)
+      System.cmd("git", ["checkout", "main"], cd: tmp_dir)
+      # delete the branch directly on the bare remote so the upstream goes away
+      System.cmd("git", ["update-ref", "-d", "refs/heads/feature"], cd: remote_dir)
+
+      assert {:ok, deleted} = Git.Branches.prune_gone(config: config)
+      assert "feature" in deleted
+      assert {:ok, false} = Git.Branches.exists?("feature", config: config)
+    end
+
+    test "dry_run reports gone branches without deleting them", %{
+      tmp_dir: tmp_dir,
+      config: config
+    } do
+      remote_dir = with_remote(tmp_dir)
+      System.cmd("git", ["checkout", "-b", "feature"], cd: tmp_dir)
+      System.cmd("git", ["push", "-u", "origin", "feature"], cd: tmp_dir)
+      System.cmd("git", ["checkout", "main"], cd: tmp_dir)
+      System.cmd("git", ["update-ref", "-d", "refs/heads/feature"], cd: remote_dir)
+
+      assert {:ok, ["feature"]} = Git.Branches.prune_gone(dry_run: true, config: config)
+      assert {:ok, true} = Git.Branches.exists?("feature", config: config)
     end
   end
 end
