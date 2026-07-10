@@ -4,6 +4,36 @@ defmodule Git.Config do
 
   Holds the path to the git binary, working directory, environment variables,
   and timeout settings used when executing git commands.
+
+  ## Controlling identity, dates, and the index
+
+  Per-call author/committer identity and dates, and the index file, are set
+  through the `:env` and `:extra_config` fields rather than dedicated options,
+  since git reads them from the environment and per-invocation config:
+
+    * Author/committer **dates** (note `commit --date` sets only the author date,
+      while the committer date is separate):
+
+          Git.Config.new(env: [
+            {"GIT_AUTHOR_DATE", "2020-01-01T00:00:00"},
+            {"GIT_COMMITTER_DATE", "2020-01-01T00:00:00"}
+          ])
+
+    * Author/committer **identity**, either via the environment or, without
+      mutating repo config, via `-c` using `:extra_config`:
+
+          Git.Config.new(extra_config: [
+            {"user.name", "A U Thor"},
+            {"user.email", "author@example.com"}
+          ])
+
+    * A scratch **index** for building commits off to the side (pairs with
+      `write_tree/1` and `commit_tree/1`):
+
+          Git.Config.new(env: [{"GIT_INDEX_FILE", "/tmp/scratch.index"}])
+
+  Any `GIT_*` variable can be passed through `:env`; entries there override the
+  built-in defaults.
   """
 
   @default_timeout 30_000
