@@ -232,6 +232,108 @@ defmodule Git.Conflicts do
   @spec take_theirs(String.t() | [String.t()], keyword()) :: {:ok, :done} | {:error, term()}
   def take_theirs(paths, opts \\ []), do: take_side(:theirs, paths, opts)
 
+  @doc """
+  Resolves conflicts by choosing one side, selected by the `:using` option.
+
+  A convenience dispatcher over `take_ours/2` and `take_theirs/2`:
+  `using: :ours` delegates to `take_ours/2` and `using: :theirs` delegates to
+  `take_theirs/2`. Any other value, including a missing `:using`, returns
+  `{:error, {:invalid_strategy, value}}`. Accepts a single path or a list of
+  paths.
+
+  Returns `{:ok, :done}` on success.
+
+  ## Options
+
+    * `:using` - `:ours` or `:theirs` (required)
+    * `:config` - a `Git.Config` struct
+
+  ## Examples
+
+      {:ok, :done} = Git.Conflicts.resolve("shared.txt", using: :ours)
+      {:ok, :done} = Git.Conflicts.resolve(["a.txt", "b.txt"], using: :theirs)
+
+  """
+  @spec resolve(String.t() | [String.t()], keyword()) :: {:ok, :done} | {:error, term()}
+  def resolve(paths, opts \\ []) do
+    {strategy, rest} = Keyword.pop(opts, :using)
+    resolve_with(strategy, paths, rest)
+  end
+
+  @doc """
+  Aborts whichever git operation is currently in progress.
+
+  Generalizes `abort_merge/1` to any conflicted operation. Probes the
+  repository's git directory to detect an in-progress merge (`MERGE_HEAD`),
+  rebase (a `rebase-merge` or `rebase-apply` directory), cherry-pick
+  (`CHERRY_PICK_HEAD`), or revert (`REVERT_HEAD`), then dispatches the matching
+  abort: `Git.merge(:abort)`, `Git.rebase(abort: true)`,
+  `Git.cherry_pick(abort: true)`, or `Git.revert(abort: true)`.
+
+  Returns `{:ok, :done}` on success, or `{:error, :no_operation_in_progress}`
+  when nothing is in progress.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct
+
+  ## Examples
+
+      {:ok, :done} = Git.Conflicts.abort()
+
+  """
+  @spec abort(keyword()) :: {:ok, :done} | {:error, term()}
+  def abort(opts \\ []) do
+    {config, _rest} = extract_config(opts)
+
+    case in_progress_operation(config) do
+      {:ok, :merge} -> Git.merge(:abort, config: config)
+      {:ok, :rebase} -> Git.rebase(abort: true, config: config)
+      {:ok, :cherry_pick} -> Git.cherry_pick(abort: true, config: config)
+      {:ok, :revert} -> Git.revert(abort: true, config: config)
+      {:ok, :none} -> {:error, :no_operation_in_progress}
+      error -> error
+    end
+  end
+
+  @doc """
+  Continues whichever git operation is currently in progress.
+
+  Uses the same detection as `abort/1`. For a rebase, cherry-pick, or revert it
+  advances the sequencer with `Git.rebase(continue_rebase: true)`,
+  `Git.cherry_pick(continue_pick: true)`, or `Git.revert(continue_revert: true)`,
+  forcing a no-op editor so the prepared commit message is reused without a TTY.
+  For a merge it concludes with `Git.commit(nil, no_edit: true)` rather than
+  `git merge --continue`, which opens an editor and fails without a TTY.
+
+  Callers must stage their conflict resolutions (for example with `resolve/2`)
+  before calling. Returns `{:ok, :done}` for rebase/cherry-pick/revert,
+  `{:ok, %Git.CommitResult{}}` for a concluded merge, or
+  `{:error, :no_operation_in_progress}` when nothing is in progress.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct
+
+  ## Examples
+
+      {:ok, _result} = Git.Conflicts.continue()
+
+  """
+  @spec continue(keyword()) :: {:ok, :done | Git.CommitResult.t()} | {:error, term()}
+  def continue(opts \\ []) do
+    {config, _rest} = extract_config(opts)
+
+    case in_progress_operation(config) do
+      {:ok, :merge} -> Git.commit(nil, no_edit: true, config: config)
+      {:ok, :rebase} -> Git.rebase(continue_rebase: true, config: noninteractive(config))
+      {:ok, :cherry_pick} -> Git.cherry_pick(continue_pick: true, config: noninteractive(config))
+      {:ok, :revert} -> Git.revert(continue_revert: true, config: noninteractive(config))
+      {:ok, :none} -> {:error, :no_operation_in_progress}
+      error -> error
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # Private helpers
   # ---------------------------------------------------------------------------
@@ -252,6 +354,43 @@ defmodule Git.Conflicts do
     with {:ok, :done} <- Git.restore([{:files, files}, {side, true}, {:config, config}]) do
       Git.add(files: files, config: config)
     end
+  end
+
+  defp resolve_with(:ours, paths, opts), do: take_ours(paths, opts)
+  defp resolve_with(:theirs, paths, opts), do: take_theirs(paths, opts)
+  defp resolve_with(other, _paths, _opts), do: {:error, {:invalid_strategy, other}}
+
+  # Detects the in-progress operation by inspecting the repository's git
+  # directory for the state files/dirs git leaves while an operation is paused
+  # on conflicts. `--absolute-git-dir` yields a path we can join and probe with
+  # `File`, and it resolves correctly for linked worktrees, whose operation
+  # state lives in a per-worktree git dir.
+  defp in_progress_operation(config) do
+    case Git.rev_parse(absolute_git_dir: true, config: config) do
+      {:ok, git_dir} -> {:ok, classify_operation(git_dir)}
+      error -> error
+    end
+  end
+
+  defp classify_operation(git_dir) do
+    cond do
+      File.exists?(Path.join(git_dir, "MERGE_HEAD")) -> :merge
+      File.dir?(Path.join(git_dir, "rebase-merge")) -> :rebase
+      File.dir?(Path.join(git_dir, "rebase-apply")) -> :rebase
+      File.exists?(Path.join(git_dir, "CHERRY_PICK_HEAD")) -> :cherry_pick
+      File.exists?(Path.join(git_dir, "REVERT_HEAD")) -> :revert
+      true -> :none
+    end
+  end
+
+  # `git rebase --continue` (and, on some git versions, cherry-pick/revert
+  # `--continue`) re-opens the commit message in an editor when concluding a
+  # conflicted step. The wrapper runs git without a TTY, so force a no-op editor
+  # to reuse the prepared message non-interactively. `GIT_EDITOR` is the
+  # highest-precedence editor setting, so it wins over core.editor/EDITOR/VISUAL.
+  defp noninteractive(%Config{env: env} = config) do
+    cleaned = Enum.reject(env, fn {key, _value} -> key == "GIT_EDITOR" end)
+    %{config | env: [{"GIT_EDITOR", "true"} | cleaned]}
   end
 
   defp extract_config(opts) do
