@@ -230,6 +230,71 @@ defmodule Git.Branches do
     end
   end
 
+  @doc """
+  Deletes local branches whose upstream tracking branch was deleted on the
+  remote.
+
+  Fetches with `--prune` (so gone upstreams are detected), then deletes every
+  local branch reported as `[gone]`. This is orthogonal to `cleanup_merged/1`:
+  a gone branch may still be unmerged, and a merged branch may still have a live
+  upstream.
+
+  ## Options
+
+    * `:remote` - remote to prune against (default `"origin"`)
+    * `:exclude` - branch names to never delete (default `["main", "master", "develop"]`)
+    * `:force` - use `-D` instead of `-d` (default `false`)
+    * `:dry_run` - return the branches that would be deleted without deleting
+      (default `false`)
+    * `:config` - a `Git.Config` struct
+
+  Returns `{:ok, deleted_names}` (or the would-be-deleted names under
+  `:dry_run`). The current branch is always skipped.
+  """
+  @spec prune_gone(keyword()) :: {:ok, [String.t()]} | {:error, term()}
+  def prune_gone(opts \\ []) do
+    {remote, opts} = Keyword.pop(opts, :remote, "origin")
+    {exclude, opts} = Keyword.pop(opts, :exclude, ["main", "master", "develop"])
+    {force, opts} = Keyword.pop(opts, :force, false)
+    {dry_run, opts} = Keyword.pop(opts, :dry_run, false)
+
+    with {:ok, :done} <- Git.fetch(Keyword.merge(opts, remote: remote, prune: true)),
+         {:ok, current_name} <- current(opts),
+         {:ok, gone} <- gone_branches(opts) do
+      to_delete = Enum.reject(gone, &(&1 == current_name or &1 in exclude))
+
+      if dry_run do
+        {:ok, to_delete}
+      else
+        delete_branches(to_delete, opts, force)
+      end
+    end
+  end
+
+  @doc """
+  Deletes a branch locally and, when `:remote` is given, on the remote too.
+
+  ## Options
+
+    * `:remote` - remote to also delete the branch from, e.g. `"origin"`;
+      `true` is shorthand for `"origin"`. When omitted, only the local branch is
+      deleted.
+    * `:force` - use `-D` instead of `-d` for the local delete (default `false`)
+    * `:config` - a `Git.Config` struct
+
+  Returns `{:ok, :done}` when the requested deletions succeed.
+  """
+  @spec delete_branch(String.t(), keyword()) :: {:ok, :done} | {:error, term()}
+  def delete_branch(name, opts \\ []) when is_binary(name) do
+    {remote, opts} = Keyword.pop(opts, :remote, nil)
+    {force, opts} = Keyword.pop(opts, :force, false)
+
+    with {:ok, _} <- Git.branch(Keyword.merge(opts, delete: name, force_delete: force)),
+         {:ok, _} <- delete_remote_branch(remote_name(remote), name, opts) do
+      {:ok, :done}
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # Private helpers
   # ---------------------------------------------------------------------------
@@ -240,6 +305,34 @@ defmodule Git.Branches do
     end)
 
     {:ok, to_delete}
+  end
+
+  defp gone_branches(opts) do
+    config = Keyword.get(opts, :config, Config.new())
+    args = ["for-each-ref", "--format=%(refname:short) %(upstream:track)", "refs/heads/"]
+    {stdout, exit_code} = System.cmd(config.binary, args, Config.cmd_opts(config))
+
+    if exit_code == 0 do
+      gone =
+        stdout
+        |> String.split("\n", trim: true)
+        |> Enum.filter(&String.contains?(&1, "[gone]"))
+        |> Enum.map(fn line -> line |> String.split(" ", parts: 2) |> hd() end)
+
+      {:ok, gone}
+    else
+      {:error, {stdout, exit_code}}
+    end
+  end
+
+  defp remote_name(true), do: "origin"
+  defp remote_name(name) when is_binary(name), do: name
+  defp remote_name(_), do: nil
+
+  defp delete_remote_branch(nil, _name, _opts), do: {:ok, :skipped}
+
+  defp delete_remote_branch(remote, name, opts) do
+    Git.push(Keyword.merge(opts, remote: remote, branch: name, delete: true))
   end
 
   defp parse_recent_entries(stdout) do
