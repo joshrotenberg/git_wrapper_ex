@@ -17,27 +17,57 @@ defmodule Git.Commands.Log do
   @type t :: %__MODULE__{
           max_count: non_neg_integer() | nil,
           author: String.t() | nil,
+          committer: String.t() | nil,
           since: String.t() | nil,
           until_date: String.t() | nil,
+          skip: non_neg_integer() | nil,
           path: String.t() | nil,
           range: String.t() | nil,
           grep: String.t() | nil,
           all_match: boolean(),
           pickaxe: String.t() | nil,
-          pickaxe_regex: String.t() | nil
+          pickaxe_regex: String.t() | nil,
+          follow: boolean(),
+          no_merges: boolean(),
+          merges: boolean(),
+          first_parent: boolean(),
+          reverse: boolean(),
+          regexp_ignore_case: boolean(),
+          extended_regexp: boolean(),
+          fixed_strings: boolean(),
+          perl_regexp: boolean(),
+          invert_grep: boolean(),
+          all: boolean(),
+          branches: boolean(),
+          tags: boolean()
         }
 
   defstruct [
     :max_count,
     :author,
+    :committer,
     :since,
     :until_date,
+    :skip,
     :path,
     :range,
     :grep,
     :pickaxe,
     :pickaxe_regex,
-    all_match: false
+    all_match: false,
+    follow: false,
+    no_merges: false,
+    merges: false,
+    first_parent: false,
+    reverse: false,
+    regexp_ignore_case: false,
+    extended_regexp: false,
+    fixed_strings: false,
+    perl_regexp: false,
+    invert_grep: false,
+    all: false,
+    branches: false,
+    tags: false
   ]
 
   @doc """
@@ -45,6 +75,14 @@ defmodule Git.Commands.Log do
 
   Uses ASCII control characters as delimiters to reliably parse output
   even when commit messages contain newlines or special characters.
+
+  In addition to `:max_count`, `:author`, `:since`, `:until_date`, `:grep`,
+  `:pickaxe`/`:pickaxe_regex`, `:range`, and `:path`, supports history controls
+  that do not change the per-commit output format: `:committer`, `:skip`,
+  `:reverse`, `:follow`, `:no_merges`/`:merges`, `:first_parent`, the grep
+  modifiers `:regexp_ignore_case` (-i), `:extended_regexp` (-E),
+  `:fixed_strings` (-F), `:perl_regexp`, `:invert_grep`, and the ref selectors
+  `:all`, `:branches`, and `:tags`.
   """
   @spec args(t()) :: [String.t()]
   @impl true
@@ -56,12 +94,27 @@ defmodule Git.Commands.Log do
 
     base
     |> maybe_add("--max-count=", command.max_count)
+    |> maybe_add("--skip=", command.skip)
     |> maybe_add("--author=", command.author)
+    |> maybe_add("--committer=", command.committer)
     |> maybe_add("--since=", command.since)
     |> maybe_add("--until=", command.until_date)
     |> maybe_add("--grep=", command.grep)
     |> maybe_add_flag(command.all_match, "--all-match")
+    |> maybe_add_flag(command.regexp_ignore_case, "-i")
+    |> maybe_add_flag(command.extended_regexp, "-E")
+    |> maybe_add_flag(command.fixed_strings, "-F")
+    |> maybe_add_flag(command.perl_regexp, "--perl-regexp")
+    |> maybe_add_flag(command.invert_grep, "--invert-grep")
     |> maybe_add_pickaxe(command.pickaxe, command.pickaxe_regex)
+    |> maybe_add_flag(command.follow, "--follow")
+    |> maybe_add_flag(command.no_merges, "--no-merges")
+    |> maybe_add_flag(command.merges, "--merges")
+    |> maybe_add_flag(command.first_parent, "--first-parent")
+    |> maybe_add_flag(command.reverse, "--reverse")
+    |> maybe_add_flag(command.all, "--all")
+    |> maybe_add_flag(command.branches, "--branches")
+    |> maybe_add_flag(command.tags, "--tags")
     |> maybe_add_range(command.range)
     |> maybe_add_path(command.path)
   end
