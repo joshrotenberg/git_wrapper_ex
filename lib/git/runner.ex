@@ -34,6 +34,13 @@ defmodule Git.Runner do
   Includes `:timeout` (milliseconds) plus the `System.cmd/3` options built by
   `Git.Config.cmd_opts/1` (`:stderr_to_stdout`, and optionally `:cd` and
   `:env`).
+
+  May also include `:input`, a binary or iodata written to the command's
+  stdin verbatim before stdin is closed, so a command that reads stdin to EOF
+  (`hash-object --stdin`, `mktree`, `stripspace`, `patch-id`, `cat-file
+  --batch`) receives it. `Git.Runner.Forcola` implements `:input`;
+  `Git.Runner.SystemCmd` cannot feed stdin and returns
+  `{:error, :stdin_unsupported}` when it is given.
   """
   @type opts :: keyword()
 
