@@ -88,6 +88,35 @@ defmodule Git.Commands.TagTest do
                ["tag", "-f", "-a", "v1.0.0", "-F", "/tmp/msg", "abc123"]
     end
 
+    test "create signed annotated tag with -s" do
+      assert Tag.args(%Tag{create: "v1.0.0", message: "release", sign: true}) ==
+               ["tag", "-s", "v1.0.0", "-m", "release"]
+    end
+
+    test "create signed annotated tag from a message file with -s" do
+      assert Tag.args(%Tag{create: "v1.0.0", file: "/tmp/msg", sign: true}) ==
+               ["tag", "-s", "v1.0.0", "-F", "/tmp/msg"]
+    end
+
+    test "create tag signed by a specific key with -u" do
+      assert Tag.args(%Tag{create: "v1.0.0", message: "release", local_user: "ABCD1234"}) ==
+               ["tag", "-u", "ABCD1234", "v1.0.0", "-m", "release"]
+    end
+
+    test "local_user takes precedence over sign" do
+      assert Tag.args(%Tag{
+               create: "v1.0.0",
+               message: "release",
+               sign: true,
+               local_user: "ABCD1234"
+             }) ==
+               ["tag", "-u", "ABCD1234", "v1.0.0", "-m", "release"]
+    end
+
+    test "sign without a message stays a lightweight tag (no editor)" do
+      assert Tag.args(%Tag{create: "v1.0.0", sign: true}) == ["tag", "v1.0.0"]
+    end
+
     test "list filtered by contains" do
       assert Tag.args(%Tag{contains: "abc123"}) ==
                ["tag", "-l", "--contains", "abc123", "--format=#{Git.Tag.format_string()}"]

@@ -164,6 +164,19 @@ defmodule Git.CommitTest do
       assert Commit.args(%Commit{message: "m", only: ["a.ex", "b.ex"]}) ==
                ["commit", "-m", "m", "--only", "--", "a.ex", "b.ex"]
     end
+
+    test "emits -S when sign is true" do
+      assert Commit.args(%Commit{message: "m", sign: true}) == ["commit", "-m", "m", "-S"]
+    end
+
+    test "emits -S<keyid> when sign is a keyid string" do
+      assert Commit.args(%Commit{message: "m", sign: "ABCD1234"}) ==
+               ["commit", "-m", "m", "-SABCD1234"]
+    end
+
+    test "omits -S when sign is false" do
+      assert Commit.args(%Commit{message: "m", sign: false}) == ["commit", "-m", "m"]
+    end
   end
 
   describe "commit flags reach git" do

@@ -4,8 +4,9 @@ defmodule Git.Commands.Commit do
 
   Supports the message (`-m`) or message-from-file (`-F`) forms, the `-a`,
   `--amend`, `--allow-empty`, `--no-verify`, `--no-edit`, and `--signoff`
-  flags, the `--author`, `--date`, `--fixup`, `--squash`, `-C`, and
-  `--cleanup` value options, and `--only` with a pathspec.
+  flags, GPG signing (`-S`/`-S<keyid>`), the `--author`, `--date`, `--fixup`,
+  `--squash`, `-C`, and `--cleanup` value options, and `--only` with a
+  pathspec.
 
   The message is optional: with `--amend --no-edit` (or `-F`), no `-m` is
   emitted.
@@ -21,6 +22,7 @@ defmodule Git.Commands.Commit do
           no_verify: boolean(),
           no_edit: boolean(),
           signoff: boolean(),
+          sign: boolean() | String.t(),
           author: String.t() | nil,
           date: String.t() | nil,
           fixup: String.t() | nil,
@@ -38,6 +40,7 @@ defmodule Git.Commands.Commit do
             no_verify: false,
             no_edit: false,
             signoff: false,
+            sign: false,
             author: nil,
             date: nil,
             fixup: nil,
@@ -65,6 +68,12 @@ defmodule Git.Commands.Commit do
       iex> Git.Commands.Commit.args(%Git.Commands.Commit{message: "m", signoff: true, author: "A U <a@u>"})
       ["commit", "-m", "m", "--signoff", "--author", "A U <a@u>"]
 
+      iex> Git.Commands.Commit.args(%Git.Commands.Commit{message: "m", sign: true})
+      ["commit", "-m", "m", "-S"]
+
+      iex> Git.Commands.Commit.args(%Git.Commands.Commit{message: "m", sign: "ABCD1234"})
+      ["commit", "-m", "m", "-SABCD1234"]
+
       iex> Git.Commands.Commit.args(%Git.Commands.Commit{fixup: "HEAD~1"})
       ["commit", "--fixup", "HEAD~1"]
 
@@ -80,6 +89,7 @@ defmodule Git.Commands.Commit do
     |> maybe_add(command.no_verify, "--no-verify")
     |> maybe_add(command.no_edit, "--no-edit")
     |> maybe_add(command.signoff, "--signoff")
+    |> add_sign(command.sign)
     |> maybe_add_value(command.author, "--author")
     |> maybe_add_value(command.date, "--date")
     |> maybe_add_value(command.fixup, "--fixup")
@@ -111,6 +121,10 @@ defmodule Git.Commands.Commit do
 
   defp add_only(args, []), do: args
   defp add_only(args, paths) when is_list(paths), do: args ++ ["--only", "--"] ++ paths
+
+  defp add_sign(args, false), do: args
+  defp add_sign(args, true), do: args ++ ["-S"]
+  defp add_sign(args, keyid) when is_binary(keyid), do: args ++ ["-S" <> keyid]
 
   defp maybe_add(args, true, flag), do: args ++ [flag]
   defp maybe_add(args, false, _flag), do: args
