@@ -101,6 +101,7 @@ defmodule Git.MixProject do
           Git.Commands.Branch,
           Git.Commands.Bundle,
           Git.Commands.CatFile,
+          Git.Commands.CheckAttr,
           Git.Commands.CheckIgnore,
           Git.Commands.Checkout,
           Git.Commands.Cherry,

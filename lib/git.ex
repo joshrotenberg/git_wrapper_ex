@@ -1596,6 +1596,40 @@ defmodule Git do
   end
 
   @doc """
+  Runs `git check-attr` to report the gitattributes applied to paths.
+
+  This is the attributes analogue of `check_ignore/1`. Output is always
+  requested with `-z`, so paths and values containing spaces or newlines
+  parse unambiguously.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:attrs` - list of attribute names to query (required unless `:all`)
+    * `:paths` - list of paths to check (required)
+    * `:all` - report every attribute set on each path (`-a`); ignores `:attrs`
+    * `:cached` - read `.gitattributes` from the index, not the working tree
+
+  Returns `{:ok, [%{path: path, attr: attr, value: value}]}`. `value` is the
+  raw info string reported by git: one of `"set"`, `"unset"`, `"unspecified"`,
+  or a custom attribute value.
+
+  ## Examples
+
+      Git.check_attr(attrs: ["diff"], paths: ["src/main.ex"])
+      Git.check_attr(attrs: ["diff", "text"], paths: ["a.ex", "b.png"])
+      Git.check_attr(all: true, paths: ["src/main.ex"])
+
+  """
+  @spec check_attr(keyword()) ::
+          {:ok, [Git.Commands.CheckAttr.attribute()]} | {:error, term()}
+  def check_attr(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.CheckAttr, rest)
+    Git.Command.run(Git.Commands.CheckAttr, command, config)
+  end
+
+  @doc """
   Runs `git notes` to manage notes attached to objects.
 
   ## Options
