@@ -24,7 +24,8 @@ defmodule Git.Commands.Fetch do
           quiet: boolean(),
           jobs: pos_integer() | nil,
           recurse_submodules: boolean() | String.t(),
-          set_upstream: boolean()
+          set_upstream: boolean(),
+          refspecs: [String.t()]
         }
 
   defstruct remote: nil,
@@ -42,7 +43,8 @@ defmodule Git.Commands.Fetch do
             quiet: false,
             jobs: nil,
             recurse_submodules: false,
-            set_upstream: false
+            set_upstream: false,
+            refspecs: []
 
   @doc """
   Returns the argument list for `git fetch`.
@@ -70,6 +72,9 @@ defmodule Git.Commands.Fetch do
       iex> Git.Commands.Fetch.args(%Git.Commands.Fetch{recurse_submodules: "on-demand"})
       ["fetch", "--recurse-submodules=on-demand"]
 
+      iex> Git.Commands.Fetch.args(%Git.Commands.Fetch{remote: "origin", refspecs: ["+main:refs/remotes/origin/main"]})
+      ["fetch", "origin", "+main:refs/remotes/origin/main"]
+
   """
   @spec args(t()) :: [String.t()]
   @impl true
@@ -95,6 +100,7 @@ defmodule Git.Commands.Fetch do
       []
       |> maybe_add_value(command.remote)
       |> maybe_add_value(command.branch)
+      |> Kernel.++(command.refspecs)
 
     flags ++ positional
   end

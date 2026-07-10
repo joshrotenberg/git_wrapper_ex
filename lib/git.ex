@@ -503,12 +503,15 @@ defmodule Git do
     * `:signed` - GPG-sign the push (`--signed`)
     * `:push_option` - list of strings, each emitted as `--push-option <value>`
       (default `[]`)
+    * `:refspecs` - list of raw `[+]<src>:<dst>` refspecs appended after the
+      remote, e.g. `["main:release"]` or `[":stale"]` to delete (default `[]`)
 
   ## Examples
 
       Git.push(remote: "origin", branch: "main")
       Git.push(remote: "origin", branch: "main", force_with_lease: true)
       Git.push(remote: "origin", branch: "main", force_with_lease: "main:abc123")
+      Git.push(remote: "origin", refspecs: ["main:release"])
       Git.push(tags: true)
       Git.push(remote: "origin", branch: "main", push_option: ["ci.skip"])
 
@@ -574,12 +577,15 @@ defmodule Git do
     * `:jobs` - number of parallel jobs (`--jobs`)
     * `:recurse_submodules` - recurse into submodules (`true` or strategy string)
     * `:set_upstream` - set upstream tracking (`--set-upstream`)
+    * `:refspecs` - list of raw `[+]<src>:<dst>` refspecs appended after the
+      remote (default `[]`)
 
   ## Examples
 
       Git.fetch()
       Git.fetch(remote: "origin", prune: true)
       Git.fetch(all: true, tags: true)
+      Git.fetch(remote: "origin", refspecs: ["+main:refs/remotes/origin/main"])
 
   """
   @spec fetch(keyword()) :: {:ok, :done} | {:error, term()}
