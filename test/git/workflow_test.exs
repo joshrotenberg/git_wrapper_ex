@@ -601,4 +601,303 @@ defmodule Git.WorkflowTest do
       assert File.read!(Path.join(tmp_dir, "f.txt")) == "v2\n"
     end
   end
+
+  # Commits a modification to an already-tracked file.
+  defp commit_change(cfg, tmp_dir, file, content, message) do
+    File.write!(Path.join(tmp_dir, file), content)
+    {:ok, :done} = Git.add(files: [file], config: cfg)
+    {:ok, _} = Git.commit(message, config: cfg)
+  end
+
+  # ---------------------------------------------------------------------------
+  # try_merge
+  # ---------------------------------------------------------------------------
+
+  describe "try_merge/2" do
+    test "merges a branch cleanly and returns the merge result" do
+      {tmp_dir, cfg} = setup_repo("try_merge_ok")
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
+
+      {:ok, _} = Git.checkout(branch: "feature", create: true, config: cfg)
+      commit_change(cfg, tmp_dir, "feature.txt", "x\n", "feat: add feature file")
+      {:ok, _} = Git.checkout(branch: "main", config: cfg)
+
+      assert {:ok, %Git.MergeResult{}} = Git.Workflow.try_merge("feature", config: cfg)
+      assert File.exists?(Path.join(tmp_dir, "feature.txt"))
+    end
+
+    test "aborts a conflicting merge and returns the error on a clean tree" do
+      {tmp_dir, cfg} = setup_repo("try_merge_conflict")
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
+
+      commit_change(cfg, tmp_dir, "c.txt", "base\n", "add c")
+      {:ok, _} = Git.checkout(branch: "other", create: true, config: cfg)
+      commit_change(cfg, tmp_dir, "c.txt", "other\n", "other change")
+      {:ok, _} = Git.checkout(branch: "main", config: cfg)
+      commit_change(cfg, tmp_dir, "c.txt", "main\n", "main change")
+
+      assert {:error, _reason} = Git.Workflow.try_merge("other", config: cfg)
+
+      # The merge was aborted: the tree is clean and we are still on main.
+      {:ok, status} = Git.status(config: cfg)
+      assert status.entries == []
+      assert {:ok, "main"} = Git.Branches.current(config: cfg)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # safe_rebase
+  # ---------------------------------------------------------------------------
+
+  describe "safe_rebase/1" do
+    test "rebases cleanly onto the upstream and returns the rebase result" do
+      {tmp_dir, cfg} = setup_repo("safe_rebase_ok")
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
+
+      commit_change(cfg, tmp_dir, "base.txt", "base\n", "base")
+      {:ok, _} = Git.checkout(branch: "topic", create: true, config: cfg)
+      commit_change(cfg, tmp_dir, "topic.txt", "t\n", "topic")
+      {:ok, _} = Git.checkout(branch: "main", config: cfg)
+      commit_change(cfg, tmp_dir, "main.txt", "m\n", "main")
+      {:ok, _} = Git.checkout(branch: "topic", config: cfg)
+
+      assert {:ok, %Git.RebaseResult{}} = Git.Workflow.safe_rebase(upstream: "main", config: cfg)
+      assert File.exists?(Path.join(tmp_dir, "main.txt"))
+    end
+
+    test "aborts a conflicting rebase and returns the error on a clean tree" do
+      {tmp_dir, cfg} = setup_repo("safe_rebase_conflict")
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
+
+      commit_change(cfg, tmp_dir, "c.txt", "base\n", "base")
+      {:ok, _} = Git.checkout(branch: "topic", create: true, config: cfg)
+      commit_change(cfg, tmp_dir, "c.txt", "topic\n", "topic change")
+      {:ok, _} = Git.checkout(branch: "main", config: cfg)
+      commit_change(cfg, tmp_dir, "c.txt", "main\n", "main change")
+      {:ok, _} = Git.checkout(branch: "topic", config: cfg)
+
+      assert {:error, _reason} = Git.Workflow.safe_rebase(upstream: "main", config: cfg)
+
+      # The rebase was aborted: the tree is clean and we are back on topic.
+      {:ok, status} = Git.status(config: cfg)
+      assert status.entries == []
+      assert {:ok, "topic"} = Git.Branches.current(config: cfg)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # release
+  # ---------------------------------------------------------------------------
+
+  describe "release/2" do
+    test "creates an annotated tag without pushing by default" do
+      {tmp_dir, cfg} = setup_repo("release_tag")
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
+
+      assert {:ok, "v1.0.0"} =
+               Git.Workflow.release("v1.0.0", message: "first release", config: cfg)
+
+      assert {:ok, true} = Git.Tags.exists?("v1.0.0", config: cfg)
+
+      # The tag is annotated (carries a tagger), not lightweight.
+      {out, 0} =
+        System.cmd("git", ["for-each-ref", "--format=%(objecttype)", "refs/tags/v1.0.0"],
+          cd: tmp_dir
+        )
+
+      assert String.trim(out) == "tag"
+    end
+
+    test "refuses to clobber an existing tag" do
+      {tmp_dir, cfg} = setup_repo("release_exists")
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
+
+      {:ok, "v1.0.0"} = Git.Workflow.release("v1.0.0", message: "first", config: cfg)
+
+      assert {:error, {:tag_exists, "v1.0.0"}} =
+               Git.Workflow.release("v1.0.0", message: "second", config: cfg)
+    end
+
+    test "pushes the tag to the remote when :push is set" do
+      {tmp_dir, _local_dir, remote_dir, cfg} = setup_remote_repo("release_push")
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
+
+      assert {:ok, "v2.0.0"} =
+               Git.Workflow.release("v2.0.0",
+                 message: "rel",
+                 push: true,
+                 remote: "origin",
+                 config: cfg
+               )
+
+      {out, 0} = System.cmd("git", ["ls-remote", "--tags", remote_dir])
+      assert out =~ "v2.0.0"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # publish
+  # ---------------------------------------------------------------------------
+
+  describe "publish/1" do
+    test "pushes the current branch to origin and sets its upstream" do
+      {tmp_dir, local_dir, remote_dir, cfg} = setup_remote_repo("publish")
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
+
+      {:ok, _} = Git.checkout(branch: "feature/pub", create: true, config: cfg)
+      File.write!(Path.join(local_dir, "p.txt"), "p\n")
+      {:ok, :done} = Git.add(files: ["p.txt"], config: cfg)
+      {:ok, _} = Git.commit("feat: pub", config: cfg)
+
+      assert {:ok, :done} = Git.Workflow.publish(config: cfg)
+
+      {out, 0} = System.cmd("git", ["ls-remote", "--heads", remote_dir])
+      assert out =~ "feature/pub"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # sync_fork
+  # ---------------------------------------------------------------------------
+
+  describe "sync_fork/1" do
+    test "fetches the upstream and fast-forwards the current branch" do
+      {tmp_dir, local_dir, remote_dir, cfg} = setup_remote_repo("sync_fork_merge")
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
+
+      push_via_second_clone(tmp_dir, remote_dir, [{"remote_change.txt", "from upstream\n"}])
+
+      assert {:ok, :synced} =
+               Git.Workflow.sync_fork(upstream: "origin", branch: "main", config: cfg)
+
+      assert File.exists?(Path.join(local_dir, "remote_change.txt"))
+    end
+
+    test "rebases local work onto the upstream with strategy: :rebase" do
+      {tmp_dir, local_dir, remote_dir, cfg} = setup_remote_repo("sync_fork_rebase")
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
+
+      push_via_second_clone(tmp_dir, remote_dir, [{"remote_change.txt", "from upstream\n"}])
+
+      File.write!(Path.join(local_dir, "local.txt"), "local\n")
+      {:ok, :done} = Git.add(files: ["local.txt"], config: cfg)
+      {:ok, _} = Git.commit("feat: local work", config: cfg)
+
+      assert {:ok, :synced} =
+               Git.Workflow.sync_fork(
+                 upstream: "origin",
+                 branch: "main",
+                 strategy: :rebase,
+                 config: cfg
+               )
+
+      assert File.exists?(Path.join(local_dir, "remote_change.txt"))
+      assert File.exists?(Path.join(local_dir, "local.txt"))
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # backport
+  # ---------------------------------------------------------------------------
+
+  describe "backport/2" do
+    test "cherry-picks a commit onto a new branch and returns to the original" do
+      {tmp_dir, cfg} = setup_repo("backport_ok")
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
+
+      commit_change(cfg, tmp_dir, "base.txt", "base\n", "base")
+      {:ok, _} = Git.checkout(branch: "feature", create: true, config: cfg)
+      commit_change(cfg, tmp_dir, "fix.txt", "fix\n", "fix: important")
+      {:ok, fix_sha} = Git.rev_parse(ref: "HEAD", config: cfg)
+      {:ok, _} = Git.checkout(branch: "main", config: cfg)
+
+      assert {:ok, %Git.CherryPickResult{}} =
+               Git.Workflow.backport(fix_sha, target: "release/1.x", base: "main", config: cfg)
+
+      # Returned to the original branch.
+      assert {:ok, "main"} = Git.Branches.current(config: cfg)
+
+      # The fix landed on the release branch.
+      {:ok, _} = Git.checkout(branch: "release/1.x", config: cfg)
+      assert File.exists?(Path.join(tmp_dir, "fix.txt"))
+    end
+
+    test "aborts a conflicting cherry-pick and restores the original branch" do
+      {tmp_dir, cfg} = setup_repo("backport_conflict")
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
+
+      commit_change(cfg, tmp_dir, "c.txt", "base\n", "base")
+      {:ok, _} = Git.checkout(branch: "feature", create: true, config: cfg)
+      commit_change(cfg, tmp_dir, "c.txt", "feature\n", "feat: change c")
+      {:ok, fix_sha} = Git.rev_parse(ref: "HEAD", config: cfg)
+      {:ok, _} = Git.checkout(branch: "main", config: cfg)
+
+      # A pre-existing release branch with a conflicting change to the same file.
+      {:ok, _} = Git.checkout(branch: "release", create: true, config: cfg)
+      commit_change(cfg, tmp_dir, "c.txt", "release\n", "release change")
+      {:ok, _} = Git.checkout(branch: "main", config: cfg)
+
+      assert {:error, _reason} = Git.Workflow.backport(fix_sha, target: "release", config: cfg)
+
+      # The cherry-pick was aborted and we are back on main with a clean tree.
+      assert {:ok, "main"} = Git.Branches.current(config: cfg)
+      {:ok, status} = Git.status(config: cfg)
+      assert status.entries == []
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # restore_branch
+  # ---------------------------------------------------------------------------
+
+  describe "restore_branch/2" do
+    test "recreates a deleted branch from the reflog at its last tip" do
+      {tmp_dir, cfg} = setup_repo("restore_reflog")
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
+
+      {:ok, _} = Git.checkout(branch: "feature", create: true, config: cfg)
+      commit_change(cfg, tmp_dir, "f.txt", "f\n", "feat: work")
+      {:ok, feature_sha} = Git.rev_parse(ref: "HEAD", config: cfg)
+      {:ok, _} = Git.checkout(branch: "main", config: cfg)
+      {:ok, _} = Git.branch(delete: "feature", force_delete: true, config: cfg)
+      {:ok, false} = Git.Branches.exists?("feature", config: cfg)
+
+      assert {:ok, ^feature_sha} = Git.Workflow.restore_branch("feature", config: cfg)
+      assert {:ok, true} = Git.Branches.exists?("feature", config: cfg)
+      assert {:ok, ^feature_sha} = Git.rev_parse(ref: "feature", config: cfg)
+    end
+
+    test "checks out the restored branch when :checkout is set" do
+      {tmp_dir, cfg} = setup_repo("restore_checkout")
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
+
+      {:ok, _} = Git.checkout(branch: "feature", create: true, config: cfg)
+      commit_change(cfg, tmp_dir, "f.txt", "f\n", "feat: work")
+      {:ok, _} = Git.checkout(branch: "main", config: cfg)
+      {:ok, _} = Git.branch(delete: "feature", force_delete: true, config: cfg)
+
+      assert {:ok, _sha} = Git.Workflow.restore_branch("feature", checkout: true, config: cfg)
+      assert {:ok, "feature"} = Git.Branches.current(config: cfg)
+    end
+
+    test "recreates a branch at an explicit :sha" do
+      {tmp_dir, cfg} = setup_repo("restore_sha")
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
+
+      commit_change(cfg, tmp_dir, "a.txt", "a\n", "add a")
+      {:ok, head_sha} = Git.rev_parse(ref: "HEAD", config: cfg)
+
+      assert {:ok, ^head_sha} =
+               Git.Workflow.restore_branch("rescued", sha: head_sha, config: cfg)
+
+      assert {:ok, ^head_sha} = Git.rev_parse(ref: "rescued", config: cfg)
+    end
+
+    test "returns :not_found when the reflog has no record of the branch" do
+      {tmp_dir, cfg} = setup_repo("restore_notfound")
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
+
+      assert {:error, :not_found} = Git.Workflow.restore_branch("never-existed", config: cfg)
+    end
+  end
 end
