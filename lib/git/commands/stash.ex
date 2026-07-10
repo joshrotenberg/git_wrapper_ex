@@ -3,7 +3,9 @@ defmodule Git.Commands.Stash do
   Implements the `Git.Command` behaviour for `git stash`.
 
   Supports listing stash entries (default), saving (pushing) changes to the
-  stash, popping the top stash entry, and dropping a stash entry.
+  stash, popping the top stash entry, applying a stash without dropping it,
+  dropping a stash entry, clearing all entries, creating a branch from a
+  stash, and showing the diff for a stash entry.
   """
 
   @behaviour Git.Command
@@ -14,19 +16,29 @@ defmodule Git.Commands.Stash do
           list: boolean(),
           save: boolean(),
           pop: boolean(),
+          apply: boolean(),
           drop: boolean(),
+          clear: boolean(),
+          branch: String.t() | nil,
+          show: boolean(),
           message: String.t() | nil,
           index: non_neg_integer() | nil,
-          include_untracked: boolean()
+          include_untracked: boolean(),
+          keep_index: boolean()
         }
 
   defstruct list: true,
             save: false,
             pop: false,
+            apply: false,
             drop: false,
+            clear: false,
+            branch: nil,
+            show: false,
             message: nil,
             index: nil,
-            include_untracked: false
+            include_untracked: false,
+            keep_index: false
 
   # Process dictionary key used to communicate the operation mode from args/1
   # to parse_output/2. Both are called from the same process inside
@@ -36,9 +48,13 @@ defmodule Git.Commands.Stash do
   @doc """
   Returns the argument list for `git stash`.
 
-  - If `:save` is true, builds `git stash push [-m <message>] [-u]`.
+  - If `:save` is true, builds `git stash push [-m <message>] [-u] [--keep-index]`.
   - If `:pop` is true, builds `git stash pop [stash@{index}]`.
+  - If `:apply` is true, builds `git stash apply [stash@{index}]`.
   - If `:drop` is true, builds `git stash drop [stash@{index}]`.
+  - If `:clear` is true, builds `git stash clear`.
+  - If `:branch` is a string, builds `git stash branch <name> [stash@{index}]`.
+  - If `:show` is true, builds `git stash show [stash@{index}]`.
   - Otherwise, lists stash entries with `git stash list`.
 
   ## Examples
@@ -58,6 +74,18 @@ defmodule Git.Commands.Stash do
       iex> Git.Commands.Stash.args(%Git.Commands.Stash{drop: true, index: 1})
       ["stash", "drop", "stash@{1}"]
 
+      iex> Git.Commands.Stash.args(%Git.Commands.Stash{apply: true, index: 1})
+      ["stash", "apply", "stash@{1}"]
+
+      iex> Git.Commands.Stash.args(%Git.Commands.Stash{clear: true})
+      ["stash", "clear"]
+
+      iex> Git.Commands.Stash.args(%Git.Commands.Stash{branch: "recovered"})
+      ["stash", "branch", "recovered"]
+
+      iex> Git.Commands.Stash.args(%Git.Commands.Stash{show: true})
+      ["stash", "show"]
+
   """
   @spec args(t()) :: [String.t()]
   @impl true
@@ -69,6 +97,7 @@ defmodule Git.Commands.Stash do
     base
     |> maybe_add_message(command.message)
     |> maybe_add_flag(command.include_untracked, "-u")
+    |> maybe_add_flag(command.keep_index, "--keep-index")
   end
 
   def args(%__MODULE__{pop: true} = command) do
@@ -76,9 +105,29 @@ defmodule Git.Commands.Stash do
     ["stash", "pop"] |> maybe_add_ref(command.index)
   end
 
+  def args(%__MODULE__{apply: true} = command) do
+    Process.put(@mode_key, :mutation)
+    ["stash", "apply"] |> maybe_add_ref(command.index)
+  end
+
   def args(%__MODULE__{drop: true} = command) do
     Process.put(@mode_key, :mutation)
     ["stash", "drop"] |> maybe_add_ref(command.index)
+  end
+
+  def args(%__MODULE__{clear: true}) do
+    Process.put(@mode_key, :mutation)
+    ["stash", "clear"]
+  end
+
+  def args(%__MODULE__{branch: branch} = command) when is_binary(branch) do
+    Process.put(@mode_key, :mutation)
+    ["stash", "branch", branch] |> maybe_add_ref(command.index)
+  end
+
+  def args(%__MODULE__{show: true} = command) do
+    Process.put(@mode_key, :show)
+    ["stash", "show"] |> maybe_add_ref(command.index)
   end
 
   def args(%__MODULE__{}) do
@@ -90,11 +139,15 @@ defmodule Git.Commands.Stash do
   Parses the output of `git stash`.
 
   For list operations (exit 0), parses each line into a `Git.StashEntry` struct.
-  For save/pop/drop operations (exit 0), returns `{:ok, :done}`.
+  For show operations (exit 0), returns the raw diff as `{:ok, stdout}`.
+  For save/pop/apply/drop/clear/branch operations (exit 0), returns `{:ok, :done}`.
   On failure, returns `{:error, {stdout, exit_code}}`.
   """
   @spec parse_output(String.t(), non_neg_integer()) ::
-          {:ok, [StashEntry.t()]} | {:ok, :done} | {:error, {String.t(), non_neg_integer()}}
+          {:ok, [StashEntry.t()]}
+          | {:ok, :done}
+          | {:ok, String.t()}
+          | {:error, {String.t(), non_neg_integer()}}
   @impl true
   def parse_output(stdout, 0) do
     mode = Process.get(@mode_key, :list)
@@ -102,6 +155,9 @@ defmodule Git.Commands.Stash do
     case mode do
       :mutation ->
         {:ok, :done}
+
+      :show ->
+        {:ok, stdout}
 
       :list ->
         if String.trim(stdout) == "" do

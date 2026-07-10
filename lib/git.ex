@@ -468,21 +468,30 @@ defmodule Git do
   end
 
   @doc """
-  Runs `git stash` to list, save, pop, or drop stash entries.
+  Runs `git stash` to list, save, pop, apply, drop, clear, branch, or show
+  stash entries.
 
   ## Options
 
     * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
     * `:save` - push current changes onto the stash (default `false`)
     * `:pop` - pop the top stash entry (default `false`)
+    * `:apply` - apply a stash entry without dropping it (default `false`)
     * `:drop` - drop a stash entry (default `false`)
+    * `:clear` - remove all stash entries (default `false`)
+    * `:branch` - create a branch with the given name from a stash entry
+    * `:show` - show the diff for a stash entry (default `false`); returns
+      `{:ok, stdout}` with the raw diff
     * `:message` - message for the stash entry (used with `:save`)
-    * `:index` - stash index for `:pop` or `:drop` (e.g., `0` for `stash@{0}`)
+    * `:index` - stash index for `:pop`, `:apply`, `:drop`, `:branch`, or
+      `:show` (e.g., `0` for `stash@{0}`)
     * `:include_untracked` - include untracked files when saving (default `false`)
+    * `:keep_index` - keep staged changes in the index when saving
+      (`--keep-index`, default `false`)
 
   """
   @spec stash(keyword()) ::
-          {:ok, [Git.StashEntry.t()]} | {:ok, :done} | {:error, term()}
+          {:ok, [Git.StashEntry.t()]} | {:ok, :done} | {:ok, String.t()} | {:error, term()}
   def stash(opts \\ []) do
     {config, rest} = Keyword.pop(opts, :config, Config.new())
     command = struct!(Git.Commands.Stash, rest)
