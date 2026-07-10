@@ -20,6 +20,18 @@ defmodule Git.Command do
               {:ok, term()} | {:error, term()}
 
   @doc """
+  Optional. Returns data to write to the command's stdin, or `nil` for none.
+
+  Implemented by commands that read stdin (for example `git mktree` and
+  `git update-index --index-info`). Stdin is only supported by the default
+  `Git.Runner.Forcola` runner; under `Git.Runner.SystemCmd` a command that
+  supplies input gets `{:error, :stdin_unsupported}`.
+  """
+  @callback input(command :: struct()) :: iodata() | nil
+
+  @optional_callbacks input: 1
+
+  @doc """
   Runs a git command.
 
   Takes a module implementing the `Git.Command` behaviour, a command
@@ -28,8 +40,12 @@ defmodule Git.Command do
   module.
 
   Execution is routed through `config.runner` (see `Git.Config` and
-  `Git.Runner`). The default `Git.Runner.SystemCmd` uses `System.cmd/3`;
-  `Git.Runner.Forcola` adds group-kill semantics on timeout.
+  `Git.Runner`). The default `Git.Runner.Forcola` runs git in its own process
+  group and kills the group on timeout (leak-free); `Git.Runner.SystemCmd` is
+  the fallback when forcola is unavailable.
+
+  If the command module implements the optional `input/1` callback and returns
+  non-nil, that data is written to the command's stdin.
 
   If the command exceeds the configured timeout, returns `{:error, :timeout}`.
 
@@ -41,11 +57,26 @@ defmodule Git.Command do
   @spec run(module(), struct(), Config.t()) :: {:ok, term()} | {:error, term()}
   def run(mod, command, %Config{} = config) do
     all_args = Config.base_args(config) ++ mod.args(command)
-    opts = Keyword.put(Config.cmd_opts(config), :timeout, config.timeout)
+
+    opts =
+      Config.cmd_opts(config)
+      |> Keyword.put(:timeout, config.timeout)
+      |> put_input(mod, command)
 
     case runner(config).run(config.binary, all_args, opts) do
       {:ok, {stdout, exit_code}} -> mod.parse_output(stdout, exit_code)
       {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp put_input(opts, mod, command) do
+    if function_exported?(mod, :input, 1) do
+      case mod.input(command) do
+        nil -> opts
+        input -> Keyword.put(opts, :input, input)
+      end
+    else
+      opts
     end
   end
 
