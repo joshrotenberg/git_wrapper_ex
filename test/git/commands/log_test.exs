@@ -1,8 +1,8 @@
 defmodule Git.LogTest do
   use ExUnit.Case, async: true
 
-  alias Git.{Commit, Config}
   alias Git.Commands.Log
+  alias Git.{Commit, Config}
 
   setup do
     tmp_dir =
