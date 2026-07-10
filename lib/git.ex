@@ -2188,4 +2188,32 @@ defmodule Git do
     command = struct!(Git.Commands.CommitTree, rest)
     Git.Command.run(Git.Commands.CommitTree, command, config)
   end
+
+  @doc """
+  Runs `git write-tree` to record the current index as a tree object.
+
+  Plumbing command. Writes a tree object from the current index (the staged
+  content) and returns its SHA. This is the counterpart to `commit_tree/1`:
+  `write-tree` produces the tree SHA that `commit-tree` needs, so together they
+  build a commit without touching HEAD or the working tree.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:prefix` - write the tree for this subdirectory of the index (`--prefix`)
+    * `:missing_ok` - allow objects that are not in the object database
+      (`--missing-ok`, default `false`)
+
+  ## Examples
+
+      {:ok, tree} = Git.write_tree()
+      {:ok, tree} = Git.write_tree(prefix: "lib")
+
+  """
+  @spec write_tree(keyword()) :: {:ok, String.t()} | {:error, term()}
+  def write_tree(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.WriteTree, rest)
+    Git.Command.run(Git.Commands.WriteTree, command, config)
+  end
 end
