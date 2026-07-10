@@ -2542,4 +2542,91 @@ defmodule Git do
     command = struct!(Git.Commands.CheckRefFormat, rest)
     Git.Command.run(Git.Commands.CheckRefFormat, command, config)
   end
+
+  @doc """
+  Runs `git read-tree` to load tree contents into the index.
+
+  Plumbing command. The read side of the index/tree pipeline behind
+  `commit_tree`/`write_tree`.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:trees` - the tree-ish arguments to read (default `[]`)
+    * `:merge` - `-m`, a two/three-way in-index merge (default `false`)
+    * `:reset` - `--reset` (default `false`)
+    * `:update` - `-u`, also update the working tree (default `false`)
+    * `:prefix` - `--prefix`, read into a subdirectory of the index
+
+  ## Examples
+
+      Git.read_tree(trees: ["HEAD"])
+      Git.read_tree(trees: ["a", "b"], merge: true, update: true)
+
+  """
+  @spec read_tree(keyword()) :: {:ok, :done} | {:error, term()}
+  def read_tree(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.ReadTree, rest)
+    Git.Command.run(Git.Commands.ReadTree, command, config)
+  end
+
+  @doc """
+  Runs `git update-index` to populate or modify the index directly.
+
+  Plumbing command. `:cacheinfo` inserts index entries with no working-tree
+  file (assemble arbitrary trees with `write_tree`); `:assume_unchanged` and
+  `:skip_worktree` hide local changes to tracked files.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:cacheinfo` - list of `{mode, object, path}` tuples (`--cacheinfo`)
+    * `:add` / `:remove` / `:refresh` - the corresponding flags (default `false`)
+    * `:chmod` - `"+x"` or `"-x"` (`--chmod`, default `nil`)
+    * `:assume_unchanged` / `:skip_worktree` - set the corresponding bits
+    * `:index_info` - read the bulk index-info format from `:stdin` (requires the
+      forcola runner)
+    * `:stdin` - the `--index-info` payload
+    * `:files` - pathspec
+
+  ## Examples
+
+      Git.update_index(cacheinfo: [{"100644", blob_sha, "config.json"}])
+      Git.update_index(skip_worktree: true, files: ["local.env"])
+
+  """
+  @spec update_index(keyword()) :: {:ok, :done} | {:error, term()}
+  def update_index(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.UpdateIndex, rest)
+    Git.Command.run(Git.Commands.UpdateIndex, command, config)
+  end
+
+  @doc """
+  Runs `git mktree` to build a tree object from entries fed on stdin.
+
+  Plumbing command. Returns the new tree's SHA, with no index or working tree.
+  With `hash_object` and `commit_tree`, synthesizes trees and commits purely
+  from object SHAs. Reads stdin, so it needs the default forcola runner.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:entries` - list of `%{mode, type, object, path}` maps
+    * `:missing` - `--missing`, allow entries pointing at missing objects
+      (default `false`)
+
+  ## Examples
+
+      {:ok, tree} =
+        Git.mktree(entries: [%{mode: "100644", type: "blob", object: blob_sha, path: "a.txt"}])
+
+  """
+  @spec mktree(keyword()) :: {:ok, String.t()} | {:error, term()}
+  def mktree(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.MkTree, rest)
+    Git.Command.run(Git.Commands.MkTree, command, config)
+  end
 end
