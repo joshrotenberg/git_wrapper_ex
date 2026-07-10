@@ -69,12 +69,22 @@ defmodule Git.Workflow do
 
     * `:strategy` - `:rebase` (default) or `:merge`
     * `:autostash` - stash uncommitted changes before syncing and pop after
-      (default `true`)
+      (default `true`). Like git's own `rebase.autostash`, only tracked changes
+      are stashed; an untracked-only working tree is not stashed.
     * `:remote` - remote name (default `"origin"`)
     * `:branch` - branch to sync with (defaults to the upstream tracking branch)
     * `:config` - a `Git.Config` struct
 
   Returns `{:ok, :synced}` on success.
+
+  When autostash is active and integration succeeds but popping the stash
+  conflicts with the freshly integrated changes, returns
+  `{:error, {:autostash_pop_failed, reason}}` (the working tree is left with the
+  popped stash and its conflict markers) rather than reporting success over it.
+
+  When integration itself fails (for example a rebase or merge conflict), the
+  autostash is left in place; recover it with `git stash pop` after resolving
+  the integration, since popping onto a mid-conflict tree would compound it.
   """
   @spec sync(keyword()) :: {:ok, :synced} | {:error, term()}
   def sync(opts \\ []) do
@@ -93,13 +103,20 @@ defmodule Git.Workflow do
         integrate(strategy, remote, branch, config_kw)
       end
 
-    if stashed do
-      Git.stash(Keyword.merge(config_kw, pop: true))
-    end
+    finish_sync(result, stashed, config_kw)
+  end
 
-    case result do
+  # On a successful integration, pop the autostash and surface a pop conflict as
+  # an error rather than reporting {:ok, :synced} over a tree left with conflict
+  # markers. On a failed integration, leave the autostash in place (popping onto
+  # a mid-conflict tree would compound the problem).
+  defp finish_sync({:error, _} = error, _stashed, _config_kw), do: error
+  defp finish_sync({:ok, _}, false, _config_kw), do: {:ok, :synced}
+
+  defp finish_sync({:ok, _}, true, config_kw) do
+    case Git.stash(Keyword.merge(config_kw, pop: true)) do
       {:ok, _} -> {:ok, :synced}
-      {:error, _} = error -> error
+      {:error, reason} -> {:error, {:autostash_pop_failed, reason}}
     end
   end
 
@@ -246,13 +263,23 @@ defmodule Git.Workflow do
 
   defp stash_if_dirty(config_kw) do
     with {:ok, status} <- Git.status(config_kw),
-         true <- status.entries != [],
+         true <- tracked_changes?(status),
          stash_opts = Keyword.merge(config_kw, save: true, message: "git_wrapper_ex autostash"),
          {:ok, :done} <- Git.stash(stash_opts) do
       true
     else
       _ -> false
     end
+  end
+
+  # Autostash mirrors git's `rebase.autostash`: only tracked changes are stashed.
+  # An untracked-only working tree is not dirty for this purpose (a plain
+  # `git stash` stashes nothing without --include-untracked), so treating it as
+  # dirty previously produced a no-op stash and a later "no stash entries" pop.
+  # An untracked entry is reported by `git status --porcelain` as `?` in the
+  # index column.
+  defp tracked_changes?(%{entries: entries}) do
+    Enum.any?(entries, fn entry -> entry.index != "?" end)
   end
 
   defp integrate(:rebase, remote, branch, config_kw) do
