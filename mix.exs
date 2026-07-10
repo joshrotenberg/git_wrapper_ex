@@ -38,7 +38,10 @@ defmodule Git.MixProject do
   defp package do
     [
       licenses: ["MIT"],
-      links: %{"GitHub" => "https://github.com/joshrotenberg/git_wrapper_ex"}
+      links: %{
+        "GitHub" => "https://github.com/joshrotenberg/git_wrapper_ex",
+        "Changelog" => "https://github.com/joshrotenberg/git_wrapper_ex/blob/main/CHANGELOG.md"
+      }
     ]
   end
 
@@ -46,7 +49,7 @@ defmodule Git.MixProject do
     [
       main: "Git",
       source_url: "https://github.com/joshrotenberg/git_wrapper_ex",
-      extras: ["README.md"],
+      extras: ["README.md", "CHANGELOG.md"],
       groups_for_modules: [
         "Higher-Level": [
           Git.Repo,
@@ -115,6 +118,7 @@ defmodule Git.MixProject do
           Git.Commands.Clean,
           Git.Commands.Clone,
           Git.Commands.Commit,
+          Git.Commands.CommitTree,
           Git.Commands.CountObjects,
           Git.Commands.Describe,
           Git.Commands.Diff,
@@ -139,6 +143,7 @@ defmodule Git.MixProject do
           Git.Commands.Merge,
           Git.Commands.MergeBase,
           Git.Commands.MergeFile,
+          Git.Commands.MergeTree,
           Git.Commands.MkTree,
           Git.Commands.Mv,
           Git.Commands.NameRev,
@@ -173,7 +178,8 @@ defmodule Git.MixProject do
           Git.Commands.VerifyCommit,
           Git.Commands.VerifyTag,
           Git.Commands.Version,
-          Git.Commands.Worktree
+          Git.Commands.Worktree,
+          Git.Commands.WriteTree
         ],
         Internals: [
           Git.Command,

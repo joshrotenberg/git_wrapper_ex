@@ -9,11 +9,12 @@ if Code.ensure_loaded?(Forcola) do
     with the command, so a timed-out command does not leave a git process
     holding `.git/index.lock` or racing the caller.
 
-    This module only compiles when `Forcola` is available. Add it to your
-    dependencies and select this runner with `Git.Config.new(runner: :forcola)`.
+    This is the default runner (`Git.Config` sets `runner: :forcola`). It only
+    compiles when the optional `Forcola` dependency is available; add it to your
+    dependencies to get leak-free execution.
 
-    forcola is POSIX-only (macOS and Linux). On other platforms keep the
-    default `Git.Runner.SystemCmd`.
+    forcola is POSIX-only (macOS and Linux). On other platforms, or when the
+    dependency is absent, the runner falls back to `Git.Runner.SystemCmd`.
 
     ## Feeding stdin
 
