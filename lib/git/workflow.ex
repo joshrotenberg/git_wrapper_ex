@@ -292,9 +292,132 @@ defmodule Git.Workflow do
     discard(dry_run, ignored, config_kw)
   end
 
+  @typedoc "A workflow step: a 1-arity function receiving the config keyword list."
+  @type step :: (keyword() -> {:ok, term()} | {:error, term()})
+
+  @typedoc "A step, optionally labeled so a failure can name it."
+  @type labeled_step :: step() | {atom(), step()}
+
+  @doc """
+  Runs a list of steps in order, threading `:config` into each and
+  short-circuiting on the first `{:error, _}`.
+
+  Each step is a 1-arity function receiving the config keyword list (the same
+  contract as `feature_branch/3`'s function), or a `{name, fun}` tuple. With a
+  tuple, a failure is reported as `{:error, {name, reason}}`; otherwise the raw
+  `{:error, reason}` is returned. Returns the last step's `{:ok, result}`; an
+  empty list returns `{:ok, nil}`.
+
+  Steps do not receive each other's results. Prefer a plain `with` for a fixed
+  sequence or when a later step needs an earlier step's output; reach for
+  `chain/2` when the step list is built at runtime.
+
+  ## Examples
+
+      [
+        {:stage, fn o -> Git.add(Keyword.merge(o, all: true)) end},
+        {:commit, fn o -> Git.commit("chore: release", o) end}
+      ]
+      |> Git.Workflow.chain(config: cfg)
+
+  """
+  @spec chain([labeled_step()], keyword()) :: {:ok, term()} | {:error, term()}
+  def chain(steps, opts \\ []) when is_list(steps) do
+    {config_kw, _rest} = Keyword.split(opts, [:config])
+
+    Enum.reduce_while(steps, {:ok, nil}, fn step, _acc ->
+      {name, fun} = normalize_step(step)
+
+      case fun.(config_kw) do
+        {:ok, _} = ok -> {:cont, ok}
+        {:error, reason} -> {:halt, tag_error(name, reason)}
+      end
+    end)
+  end
+
+  @doc """
+  Checks out `ref`, runs `fun` on it, then restores the original branch.
+
+  The original branch is restored even if `fun` raises. Pass `create: true` to
+  create the branch first. Returns `fun`'s result. This is the reusable bracket
+  underneath `feature_branch/3`.
+
+  ## Options
+
+    * `:create` - create `ref` as a new branch before running (default `false`)
+    * `:config` - a `Git.Config` struct
+
+  """
+  @spec with_branch(String.t(), step(), keyword()) :: {:ok, term()} | {:error, term()}
+  def with_branch(ref, fun, opts \\ []) when is_binary(ref) and is_function(fun, 1) do
+    {config_kw, rest} = Keyword.split(opts, [:config])
+    create? = Keyword.get(rest, :create, false)
+
+    with {:ok, original} <- Git.Branches.current(config_kw),
+         {:ok, _} <- checkout_ref(ref, create?, config_kw) do
+      bracket(
+        fn -> fun.(config_kw) end,
+        fn -> Git.checkout(Keyword.merge(config_kw, branch: original)) end
+      )
+    end
+  end
+
+  @doc """
+  Stashes uncommitted tracked changes (only if the tree is dirty), runs `fun`,
+  then pops the stash.
+
+  The stash is popped even if `fun` raises. Returns `fun`'s result. A pop that
+  fails (for example a conflict) is surfaced as the error rather than hidden.
+  This is the `:autostash` behavior of `sync/1`, made reusable.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct
+
+  """
+  @spec with_stash(step(), keyword()) :: {:ok, term()} | {:error, term()}
+  def with_stash(fun, opts \\ []) when is_function(fun, 1) do
+    {config_kw, _rest} = Keyword.split(opts, [:config])
+    stashed? = stash_if_dirty(config_kw)
+
+    bracket(
+      fn -> fun.(config_kw) end,
+      fn -> if stashed?, do: Git.stash(Keyword.merge(config_kw, pop: true)) end
+    )
+  end
+
   # ---------------------------------------------------------------------------
   # Private helpers
   # ---------------------------------------------------------------------------
+
+  defp normalize_step({name, fun}) when is_atom(name) and is_function(fun, 1), do: {name, fun}
+  defp normalize_step(fun) when is_function(fun, 1), do: {nil, fun}
+
+  defp tag_error(nil, reason), do: {:error, reason}
+  defp tag_error(name, reason), do: {:error, {name, reason}}
+
+  defp checkout_ref(ref, true, config_kw), do: Git.Branches.create_and_checkout(ref, config_kw)
+
+  defp checkout_ref(ref, false, config_kw),
+    do: Git.checkout(Keyword.merge(config_kw, branch: ref))
+
+  # Runs body, then always runs cleanup (even on a raise). On the ok path a
+  # cleanup failure is surfaced rather than dropped; on the error/raise path the
+  # original result/exception wins and cleanup is best-effort.
+  defp bracket(body, cleanup) do
+    result = body.()
+
+    case {result, cleanup.()} do
+      {{:ok, _} = ok, {:error, _} = cleanup_error} -> keep_cleanup_error(ok, cleanup_error)
+      {result, _} -> result
+    end
+  rescue
+    e ->
+      cleanup.()
+      reraise e, __STACKTRACE__
+  end
+
+  defp keep_cleanup_error(_ok, cleanup_error), do: cleanup_error
 
   # Needs count+1 commits so HEAD~count is a valid reset target; returns the top
   # `count` commits (the ones that will be moved off HEAD).

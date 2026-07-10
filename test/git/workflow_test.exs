@@ -505,4 +505,100 @@ defmodule Git.WorkflowTest do
       assert File.exists?(Path.join(tmp_dir, "keep.txt"))
     end
   end
+
+  describe "chain/2" do
+    test "runs steps in order threading config and returns the last result" do
+      {tmp_dir, cfg} = setup_repo("chain_ok")
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
+
+      File.write!(Path.join(tmp_dir, "a.txt"), "a\n")
+
+      assert {:ok, result} =
+               Git.Workflow.chain(
+                 [
+                   fn o -> Git.add(Keyword.merge(o, all: true)) end,
+                   fn o -> Git.commit("feat: via chain", o) end
+                 ],
+                 config: cfg
+               )
+
+      assert result.subject == "feat: via chain"
+    end
+
+    test "short-circuits on the first error and names a labeled step" do
+      {_tmp_dir, cfg} = setup_repo("chain_err")
+
+      assert {:error, {:boom, :nope}} =
+               Git.Workflow.chain(
+                 [
+                   {:ok_step, fn _ -> {:ok, 1} end},
+                   {:boom, fn _ -> {:error, :nope} end},
+                   {:never, fn _ -> raise "should not run" end}
+                 ],
+                 config: cfg
+               )
+    end
+
+    test "an empty list returns {:ok, nil}" do
+      assert {:ok, nil} = Git.Workflow.chain([])
+    end
+  end
+
+  describe "with_branch/3" do
+    test "runs on the branch and restores the original branch" do
+      {tmp_dir, cfg} = setup_repo("with_branch")
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
+
+      assert {:ok, :ran} =
+               Git.Workflow.with_branch(
+                 "feat/wb",
+                 fn o ->
+                   {:ok, current} = Git.Branches.current(o)
+                   assert current == "feat/wb"
+                   {:ok, :ran}
+                 end,
+                 create: true,
+                 config: cfg
+               )
+
+      assert {:ok, "main"} = Git.Branches.current(config: cfg)
+    end
+
+    test "restores the original branch even when the function raises" do
+      {tmp_dir, cfg} = setup_repo("with_branch_raise")
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
+
+      assert_raise RuntimeError, fn ->
+        Git.Workflow.with_branch("feat/boom", fn _ -> raise "boom" end, create: true, config: cfg)
+      end
+
+      assert {:ok, "main"} = Git.Branches.current(config: cfg)
+    end
+  end
+
+  describe "with_stash/2" do
+    test "stashes tracked changes, runs on a clean tree, and restores them" do
+      {tmp_dir, cfg} = setup_repo("with_stash")
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
+
+      File.write!(Path.join(tmp_dir, "f.txt"), "v1\n")
+      {:ok, :done} = Git.add(files: ["f.txt"], config: cfg)
+      {:ok, _} = Git.commit("add f", config: cfg)
+      # dirty the tracked file
+      File.write!(Path.join(tmp_dir, "f.txt"), "v2\n")
+
+      assert {:ok, :clean} =
+               Git.Workflow.with_stash(
+                 fn o ->
+                   {:ok, status} = Git.status(o)
+                   assert status.entries == []
+                   {:ok, :clean}
+                 end,
+                 config: cfg
+               )
+
+      # the WIP change is restored after the stash pop
+      assert File.read!(Path.join(tmp_dir, "f.txt")) == "v2\n"
+    end
+  end
 end
