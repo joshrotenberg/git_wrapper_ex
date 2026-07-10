@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.1](https://github.com/joshrotenberg/git_wrapper_ex/compare/v0.6.0...v0.6.1) (2026-07-10)
+
+
+### Bug Fixes
+
+* **forcola:** build stdout accumulator as a proper list ([#159](https://github.com/joshrotenberg/git_wrapper_ex/issues/159)) ([2505416](https://github.com/joshrotenberg/git_wrapper_ex/commit/250541684c7ca312b4eb4205ab98ad8c0dff4939))
+* **test:** stop GitTest reusing polluted temp repos across runs ([#158](https://github.com/joshrotenberg/git_wrapper_ex/issues/158)) ([891ccc6](https://github.com/joshrotenberg/git_wrapper_ex/commit/891ccc6ac0b4747dbd8434bbb88355f8d54c1f6b))
+
 ## [0.6.0](https://github.com/joshrotenberg/git_wrapper_ex/compare/v0.5.0...v0.6.0) (2026-07-10)
 
 
