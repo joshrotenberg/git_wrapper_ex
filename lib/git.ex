@@ -216,8 +216,18 @@ defmodule Git do
     * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
     * `:staged` - show staged (cached) diff (default `false`)
     * `:stat` - return file-level stats instead of full patch (default `false`)
+    * `:numstat` - machine-readable per-file insertion/deletion counts, parsed
+      into `files` with exact counts (default `false`)
     * `:name_only` - list only file paths (default `false`)
     * `:name_status` - list file paths with status letters (default `false`)
+    * `:ignore_all_space` - ignore all whitespace (`-w`, default `false`)
+    * `:ignore_space_change` - ignore changes in amount of whitespace (`-b`, default `false`)
+    * `:ignore_space_at_eol` - ignore whitespace at end of line (default `false`)
+    * `:find_renames` - detect renames (`-M`, default `false`)
+    * `:find_copies` - detect copies (`-C`, default `false`)
+    * `:reverse` - swap the two sides of the diff (`-R`, default `false`)
+    * `:unified` - number of context lines (`-U<n>`, default `nil`)
+    * `:diff_filter` - select changes by type, e.g. `"ACMR"` (`--diff-filter`, default `nil`)
     * `:ref` - compare against this ref (e.g., `"HEAD~1"`)
     * `:ref_end` - second ref for two-ref comparisons (requires `:ref`)
     * `:path` - limit the diff to this path
