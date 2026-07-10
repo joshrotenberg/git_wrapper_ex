@@ -188,7 +188,25 @@ defmodule Git do
     {config, rest} = Keyword.pop(opts, :config, Config.new())
     fields = if is_nil(message), do: rest, else: Keyword.put(rest, :message, message)
     command = struct!(Git.Commands.Commit, fields)
-    Git.Command.run(Git.Commands.Commit, command, config)
+
+    case Git.Command.run(Git.Commands.Commit, command, config) do
+      {:ok, %Git.CommitResult{} = result} ->
+        {:ok, %{result | full_hash: resolve_full_hash(config)}}
+
+      other ->
+        other
+    end
+  end
+
+  # git commit prints only the abbreviated hash; resolve the full SHA of the
+  # commit just created so CommitResult carries a stable identifier. Falls back
+  # to "" if rev-parse cannot run (it effectively always can, right after a
+  # successful commit).
+  defp resolve_full_hash(config) do
+    case rev_parse(ref: "HEAD", config: config) do
+      {:ok, full} -> full
+      _ -> ""
+    end
   end
 
   @doc """

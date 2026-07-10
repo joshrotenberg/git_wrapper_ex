@@ -14,6 +14,7 @@ defmodule Git.Commands.Branch do
           list: boolean(),
           create: String.t() | nil,
           start_point: String.t() | nil,
+          force: boolean(),
           delete: String.t() | nil,
           force_delete: boolean(),
           all: boolean(),
@@ -26,6 +27,7 @@ defmodule Git.Commands.Branch do
   defstruct list: true,
             create: nil,
             start_point: nil,
+            force: false,
             delete: nil,
             force_delete: false,
             all: false,
@@ -37,7 +39,8 @@ defmodule Git.Commands.Branch do
   @doc """
   Returns the argument list for `git branch`.
 
-  - If `:create` is set, builds `git branch <name>` (appending `:start_point` when set).
+  - If `:create` is set, builds `git branch <name>` (appending `:start_point`
+    when set, and `-f` with `force: true` to move an existing branch).
   - If `:delete` is set, builds `git branch -d <name>` (or `-D` with `force_delete: true`).
   - Otherwise, lists branches with `-vv` and optionally `--all`.
 
@@ -52,17 +55,21 @@ defmodule Git.Commands.Branch do
       iex> Git.Commands.Branch.args(%Git.Commands.Branch{create: "feat/new", start_point: "HEAD~1"})
       ["branch", "feat/new", "HEAD~1"]
 
+      iex> Git.Commands.Branch.args(%Git.Commands.Branch{create: "phase", start_point: "abc123", force: true})
+      ["branch", "-f", "phase", "abc123"]
+
       iex> Git.Commands.Branch.args(%Git.Commands.Branch{delete: "old", force_delete: true})
       ["branch", "-D", "old"]
 
   """
   @spec args(t()) :: [String.t()]
   @impl true
-  def args(%__MODULE__{create: name, start_point: start_point})
-      when is_binary(name) and is_binary(start_point),
-      do: ["branch", name, start_point]
-
-  def args(%__MODULE__{create: name}) when is_binary(name), do: ["branch", name]
+  def args(%__MODULE__{create: name} = command) when is_binary(name) do
+    ["branch"]
+    |> maybe_add_flag(command.force, "-f")
+    |> Kernel.++([name])
+    |> maybe_add_value(command.start_point)
+  end
 
   def args(%__MODULE__{delete: name, force_delete: true}) when is_binary(name),
     do: ["branch", "-D", name]
@@ -132,4 +139,10 @@ defmodule Git.Commands.Branch do
   end
 
   def parse_merged_output(stdout, exit_code), do: {:error, {stdout, exit_code}}
+
+  defp maybe_add_flag(args, true, flag), do: args ++ [flag]
+  defp maybe_add_flag(args, false, _flag), do: args
+
+  defp maybe_add_value(args, nil), do: args
+  defp maybe_add_value(args, value) when is_binary(value), do: args ++ [value]
 end

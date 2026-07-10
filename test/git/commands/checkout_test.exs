@@ -196,5 +196,42 @@ defmodule Git.CheckoutTest do
                files: ["README.md", "lib/foo.ex"]
              }) == ["checkout", "--", "README.md", "lib/foo.ex"]
     end
+
+    test "builds args with --ignore-other-worktrees" do
+      assert Git.Commands.Checkout.args(%Git.Commands.Checkout{
+               branch: "shared",
+               ignore_other_worktrees: true
+             }) == ["checkout", "--ignore-other-worktrees", "shared"]
+    end
+
+    test "builds create args with --ignore-other-worktrees" do
+      assert Git.Commands.Checkout.args(%Git.Commands.Checkout{
+               branch: "shared",
+               create: true,
+               ignore_other_worktrees: true
+             }) == ["checkout", "--ignore-other-worktrees", "-b", "shared"]
+    end
+  end
+
+  describe "checkout --ignore-other-worktrees (integration)" do
+    test "overrides the guard against a branch used by another worktree", %{
+      tmp_dir: tmp_dir,
+      config: config
+    } do
+      System.cmd("git", ["branch", "shared"], cd: tmp_dir)
+
+      wt = Path.join(tmp_dir, "wt-shared")
+      System.cmd("git", ["worktree", "add", wt, "shared"], cd: tmp_dir)
+
+      # git refuses to check out a branch already used by another worktree
+      assert {:error, {output, _}} = Git.checkout(branch: "shared", config: config)
+      assert output =~ "used by worktree"
+
+      # the deliberate override succeeds
+      assert {:ok, %Checkout{} = result} =
+               Git.checkout(branch: "shared", ignore_other_worktrees: true, config: config)
+
+      assert result.branch == "shared"
+    end
   end
 end

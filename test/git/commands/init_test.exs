@@ -36,6 +36,15 @@ defmodule Git.InitTest do
       assert Init.args(%Init{bare: true, path: "/tmp/repo.git"}) ==
                ["init", "--bare", "/tmp/repo.git"]
     end
+
+    test "builds args with --initial-branch" do
+      assert Init.args(%Init{initial_branch: "main"}) == ["init", "--initial-branch=main"]
+    end
+
+    test "builds args with --bare, --initial-branch, and a path" do
+      assert Init.args(%Init{bare: true, initial_branch: "main", path: "/tmp/repo.git"}) ==
+               ["init", "--bare", "--initial-branch=main", "/tmp/repo.git"]
+    end
   end
 
   describe "Git.Commands.Init parse_output/2" do
@@ -75,6 +84,13 @@ defmodule Git.InitTest do
       System.cmd("git", ["init"], cd: config.working_dir)
 
       assert {:ok, :done} = Git.init(config: config)
+    end
+
+    test "sets the initial branch name", %{config: config} do
+      assert {:ok, :done} = Git.init(initial_branch: "trunk", config: config)
+      # A branch name only materializes after the first commit; check the HEAD symref.
+      {head, 0} = System.cmd("git", ["symbolic-ref", "HEAD"], cd: config.working_dir)
+      assert String.trim(head) == "refs/heads/trunk"
     end
   end
 end
