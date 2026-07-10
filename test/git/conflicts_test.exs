@@ -141,4 +141,96 @@ defmodule Git.ConflictsTest do
       assert {:ok, false} = Git.Conflicts.detect(config: config)
     end
   end
+
+  describe "base/2, ours/2, theirs/2" do
+    test "reads each merge stage of a conflicted path", %{tmp_dir: tmp_dir, config: config} do
+      create_conflict(tmp_dir)
+
+      # The setup writes files with no trailing newline, so the raw blob
+      # content is exactly these strings.
+      assert {:ok, "initial content"} = Git.Conflicts.base("shared.txt", config: config)
+      assert {:ok, "main version"} = Git.Conflicts.ours("shared.txt", config: config)
+      assert {:ok, "branch version"} = Git.Conflicts.theirs("shared.txt", config: config)
+    end
+
+    test "base returns an error when there is no common ancestor", %{
+      tmp_dir: tmp_dir,
+      config: config
+    } do
+      # An add/add conflict has stages 2 and 3 but no stage 1 (no base).
+      System.cmd("git", ["checkout", "-b", "add-side"], cd: tmp_dir)
+      File.write!(Path.join(tmp_dir, "added.txt"), "from branch")
+      System.cmd("git", ["add", "added.txt"], cd: tmp_dir)
+      System.cmd("git", ["commit", "-m", "add on branch"], cd: tmp_dir, env: @git_env)
+
+      System.cmd("git", ["checkout", "main"], cd: tmp_dir)
+      File.write!(Path.join(tmp_dir, "added.txt"), "from main")
+      System.cmd("git", ["add", "added.txt"], cd: tmp_dir)
+      System.cmd("git", ["commit", "-m", "add on main"], cd: tmp_dir, env: @git_env)
+
+      System.cmd("git", ["merge", "add-side"], cd: tmp_dir, env: @git_env)
+
+      assert {:error, _} = Git.Conflicts.base("added.txt", config: config)
+      assert {:ok, "from main"} = Git.Conflicts.ours("added.txt", config: config)
+      assert {:ok, "from branch"} = Git.Conflicts.theirs("added.txt", config: config)
+    end
+  end
+
+  describe "take_ours/2" do
+    test "resolves a conflict with our side and stages it", %{tmp_dir: tmp_dir, config: config} do
+      create_conflict(tmp_dir)
+
+      assert {:ok, :done} = Git.Conflicts.take_ours("shared.txt", config: config)
+
+      # Working tree holds our version and the conflict is resolved+staged.
+      assert File.read!(Path.join(tmp_dir, "shared.txt")) == "main version"
+      assert {:ok, true} = Git.Conflicts.resolved?(config: config)
+
+      {porcelain, 0} = System.cmd("git", ["status", "--porcelain"], cd: tmp_dir)
+      assert String.trim(porcelain) == ""
+    end
+
+    test "accepts a list of paths", %{tmp_dir: tmp_dir, config: config} do
+      # Second file to conflict on.
+      File.write!(Path.join(tmp_dir, "other.txt"), "initial other")
+      System.cmd("git", ["add", "other.txt"], cd: tmp_dir)
+      System.cmd("git", ["commit", "-m", "add other"], cd: tmp_dir, env: @git_env)
+
+      System.cmd("git", ["checkout", "-b", "multi"], cd: tmp_dir)
+      File.write!(Path.join(tmp_dir, "shared.txt"), "branch shared")
+      File.write!(Path.join(tmp_dir, "other.txt"), "branch other")
+      System.cmd("git", ["add", "."], cd: tmp_dir)
+      System.cmd("git", ["commit", "-m", "branch changes"], cd: tmp_dir, env: @git_env)
+
+      System.cmd("git", ["checkout", "main"], cd: tmp_dir)
+      File.write!(Path.join(tmp_dir, "shared.txt"), "main shared")
+      File.write!(Path.join(tmp_dir, "other.txt"), "main other")
+      System.cmd("git", ["add", "."], cd: tmp_dir)
+      System.cmd("git", ["commit", "-m", "main changes"], cd: tmp_dir, env: @git_env)
+
+      System.cmd("git", ["merge", "multi"], cd: tmp_dir, env: @git_env)
+
+      assert {:ok, :done} =
+               Git.Conflicts.take_ours(["shared.txt", "other.txt"], config: config)
+
+      assert File.read!(Path.join(tmp_dir, "shared.txt")) == "main shared"
+      assert File.read!(Path.join(tmp_dir, "other.txt")) == "main other"
+      assert {:ok, true} = Git.Conflicts.resolved?(config: config)
+    end
+  end
+
+  describe "take_theirs/2" do
+    test "resolves a conflict with their side and stages it", %{
+      tmp_dir: tmp_dir,
+      config: config
+    } do
+      create_conflict(tmp_dir)
+
+      assert {:ok, :done} = Git.Conflicts.take_theirs("shared.txt", config: config)
+
+      # Working tree holds their (branch) version and the conflict is resolved.
+      assert File.read!(Path.join(tmp_dir, "shared.txt")) == "branch version"
+      assert {:ok, true} = Git.Conflicts.resolved?(config: config)
+    end
+  end
 end

@@ -127,6 +127,7 @@ defmodule Git.MixProject do
           Git.Commands.Maintenance,
           Git.Commands.Merge,
           Git.Commands.MergeBase,
+          Git.Commands.MergeFile,
           Git.Commands.Mv,
           Git.Commands.Notes,
           Git.Commands.Pull,

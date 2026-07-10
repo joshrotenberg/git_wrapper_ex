@@ -391,6 +391,50 @@ defmodule Git do
   end
 
   @doc """
+  Runs `git merge-file` to perform a scripted three-way merge of three files.
+
+  Incorporates the changes that lead from `base` to `other` into `current`,
+  writing the merged result (with conflict markers where the two sides overlap)
+  back into the `current` file. This works purely on files on disk; the index
+  and history are not touched.
+
+  Returns `{:ok, count}` where `count` is the number of conflicts (`0` for a
+  clean merge). A real error (bad option, missing file) returns
+  `{:error, {stdout, exit_code}}`.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:quiet` - do not warn about conflicts (`-q`, default `false`)
+    * `:ours` - resolve conflicts in favor of `current` (`--ours`, default `false`)
+    * `:theirs` - resolve conflicts in favor of `other` (`--theirs`, default `false`)
+    * `:union` - resolve conflicts by keeping both sides (`--union`, default `false`)
+    * `:diff3` - use a diff3-based merge with base markers (`--diff3`, default `false`)
+    * `:zdiff3` - use a zealous diff3-based merge (`--zdiff3`, default `false`)
+    * `:marker_size` - conflict marker length (`--marker-size`, default `nil`)
+    * `:labels` - up to three labels applied to `current`, `base`, `other`
+      conflict markers, in order (`-L`, default `[]`)
+
+  ## Examples
+
+      Git.merge_file("current.txt", "base.txt", "other.txt")
+      Git.merge_file("current.txt", "base.txt", "other.txt", ours: true)
+      Git.merge_file("current.txt", "base.txt", "other.txt", labels: ["ours", "base", "theirs"])
+
+  """
+  @spec merge_file(String.t(), String.t(), String.t(), keyword()) ::
+          {:ok, non_neg_integer()} | {:error, term()}
+  def merge_file(current, base, other, opts \\ [])
+      when is_binary(current) and is_binary(base) and is_binary(other) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+
+    command =
+      struct!(Git.Commands.MergeFile, [current: current, base: base, other: other] ++ rest)
+
+    Git.Command.run(Git.Commands.MergeFile, command, config)
+  end
+
+  @doc """
   Runs `git init` to initialize a new repository.
 
   ## Options
