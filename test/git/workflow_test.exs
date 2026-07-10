@@ -47,6 +47,30 @@ defmodule Git.WorkflowTest do
     {tmp_dir, local_dir, remote_dir, cfg}
   end
 
+  # Clones the remote into a throwaway dir, writes the given {file, content}
+  # changes, commits, and pushes, so the caller's local repo has something to
+  # sync down.
+  defp push_via_second_clone(tmp_dir, remote_dir, changes) do
+    second_dir = Path.join(tmp_dir, "second_#{:erlang.unique_integer([:positive])}")
+    File.mkdir_p!(second_dir)
+    second_cfg = Config.new(working_dir: second_dir)
+    System.cmd("git", ["clone", remote_dir, second_dir])
+
+    {:ok, :done} =
+      Git.git_config(set_key: "user.name", set_value: "Test User", config: second_cfg)
+
+    {:ok, :done} =
+      Git.git_config(set_key: "user.email", set_value: "test@test.com", config: second_cfg)
+
+    Enum.each(changes, fn {file, content} ->
+      File.write!(Path.join(second_dir, file), content)
+    end)
+
+    {:ok, :done} = Git.add(all: true, config: second_cfg)
+    {:ok, _} = Git.commit("feat: remote change", config: second_cfg)
+    {:ok, :done} = Git.push(config: second_cfg)
+  end
+
   # ---------------------------------------------------------------------------
   # feature_branch
   # ---------------------------------------------------------------------------
@@ -185,6 +209,55 @@ defmodule Git.WorkflowTest do
                )
 
       # The remote change should now be in the local repo
+      assert File.exists?(Path.join(local_dir, "remote_change.txt"))
+    end
+
+    test "autostash stashes tracked changes and restores them on a clean pop" do
+      {tmp_dir, local_dir, remote_dir, cfg} = setup_remote_repo("sync_autostash_ok")
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
+
+      # Remote adds a new, unrelated file.
+      push_via_second_clone(tmp_dir, remote_dir, [{"remote_change.txt", "from remote\n"}])
+
+      # Local has an uncommitted tracked change to a different file.
+      File.write!(Path.join(local_dir, "README.md"), "# Test\nlocal wip\n")
+
+      assert {:ok, :synced} =
+               Git.Workflow.sync(strategy: :rebase, remote: "origin", branch: "main", config: cfg)
+
+      # Remote change pulled in AND the local WIP restored by the stash pop.
+      assert File.exists?(Path.join(local_dir, "remote_change.txt"))
+      assert File.read!(Path.join(local_dir, "README.md")) == "# Test\nlocal wip\n"
+    end
+
+    test "surfaces an autostash pop conflict instead of reporting :synced" do
+      {tmp_dir, local_dir, remote_dir, cfg} = setup_remote_repo("sync_autostash_conflict")
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
+
+      # Remote changes README on the line the local WIP also changes.
+      push_via_second_clone(tmp_dir, remote_dir, [{"README.md", "# Test\nremote line\n"}])
+
+      # Local has a conflicting uncommitted change to the same spot.
+      File.write!(Path.join(local_dir, "README.md"), "# Test\nlocal line\n")
+
+      assert {:error, {:autostash_pop_failed, _reason}} =
+               Git.Workflow.sync(strategy: :rebase, remote: "origin", branch: "main", config: cfg)
+    end
+
+    test "an untracked-only working tree syncs without a pointless stash" do
+      {tmp_dir, local_dir, remote_dir, cfg} = setup_remote_repo("sync_untracked_only")
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
+
+      push_via_second_clone(tmp_dir, remote_dir, [{"remote_change.txt", "from remote\n"}])
+
+      # Only an untracked file present (never git-added): not "dirty" for autostash.
+      File.write!(Path.join(local_dir, "untracked.txt"), "keep me\n")
+
+      assert {:ok, :synced} =
+               Git.Workflow.sync(strategy: :rebase, remote: "origin", branch: "main", config: cfg)
+
+      # The untracked file is untouched and the remote change arrived.
+      assert File.read!(Path.join(local_dir, "untracked.txt")) == "keep me\n"
       assert File.exists?(Path.join(local_dir, "remote_change.txt"))
     end
   end
