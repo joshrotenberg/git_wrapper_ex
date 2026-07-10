@@ -1918,6 +1918,7 @@ defmodule Git do
     * `:check` - check if patch applies cleanly without applying (`--check`)
     * `:stat` - show diffstat (`--stat`)
     * `:summary` - show summary (`--summary`)
+    * `:numstat` - show machine-readable added/removed line counts (`--numstat`)
     * `:cached` - apply to index only (`--cached`)
     * `:index` - apply to index and working tree (`--index`)
     * `:reverse` - apply in reverse (`--reverse`)
@@ -1948,6 +1949,7 @@ defmodule Git do
     * `:directory` - path to directory of patches
     * `:three_way` - 3-way merge on conflict (`--3way`)
     * `:keep` - keep subject prefix (`--keep`)
+    * `:keep_cr` - keep carriage return at line ends (`--keep-cr`)
     * `:signoff` - add Signed-off-by line (`--signoff`)
     * `:abort` - abort current am session (`--abort`)
     * `:continue_` - continue after resolving conflict (`--continue`)

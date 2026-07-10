@@ -59,6 +59,11 @@ defmodule Git.AmTest do
                ["am", "--keep", "0001-fix.patch"]
     end
 
+    test "builds args with --keep-cr" do
+      assert Am.args(%Am{patches: ["0001-fix.patch"], keep_cr: true}) ==
+               ["am", "--keep-cr", "0001-fix.patch"]
+    end
+
     test "builds args with --signoff" do
       assert Am.args(%Am{patches: ["0001-fix.patch"], signoff: true}) ==
                ["am", "--signoff", "0001-fix.patch"]
