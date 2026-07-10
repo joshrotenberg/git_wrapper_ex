@@ -14,6 +14,7 @@ defmodule Git.Commands.Am do
           directory: String.t() | nil,
           three_way: boolean(),
           keep: boolean(),
+          keep_cr: boolean(),
           signoff: boolean(),
           abort: boolean(),
           continue_: boolean(),
@@ -25,6 +26,7 @@ defmodule Git.Commands.Am do
             directory: nil,
             three_way: false,
             keep: false,
+            keep_cr: false,
             signoff: false,
             abort: false,
             continue_: false,
@@ -69,6 +71,7 @@ defmodule Git.Commands.Am do
     ["am"]
     |> maybe_add(command.three_way, "--3way")
     |> maybe_add(command.keep, "--keep")
+    |> maybe_add(command.keep_cr, "--keep-cr")
     |> maybe_add(command.signoff, "--signoff")
     |> maybe_add(command.quiet, "--quiet")
     |> maybe_add_patches(command.patches, command.directory)

@@ -47,6 +47,11 @@ defmodule Git.ApplyTest do
                ["apply", "--summary", "fix.patch"]
     end
 
+    test "builds args with --numstat" do
+      assert Apply.args(%Apply{patch: "fix.patch", numstat: true}) ==
+               ["apply", "--numstat", "fix.patch"]
+    end
+
     test "builds args with --cached" do
       assert Apply.args(%Apply{patch: "fix.patch", cached: true}) ==
                ["apply", "--cached", "fix.patch"]
@@ -117,6 +122,20 @@ defmodule Git.ApplyTest do
       assert {:ok, output} = Git.apply_patch(patch: patch_path, stat: true, config: config)
       assert is_binary(output)
       assert output =~ "hello.txt"
+    end
+
+    test "returns numstat output", %{tmp_dir: tmp_dir, config: config} do
+      File.write!(Path.join(tmp_dir, "hello.txt"), "hello world\n")
+
+      {patch_content, 0} = System.cmd("git", ["diff"], cd: tmp_dir)
+      patch_path = Path.join(tmp_dir, "change.patch")
+      File.write!(patch_path, patch_content)
+
+      assert {:ok, output} = Git.apply_patch(patch: patch_path, numstat: true, config: config)
+      assert is_binary(output)
+      assert output =~ "hello.txt"
+      # numstat is machine-readable: <added>\t<removed>\t<path>
+      assert output =~ ~r/^\d+\t\d+\thello\.txt/m
     end
 
     test "applies a patch in reverse", %{tmp_dir: tmp_dir, config: config} do

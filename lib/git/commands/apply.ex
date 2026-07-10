@@ -16,6 +16,7 @@ defmodule Git.Commands.Apply do
           check: boolean(),
           stat: boolean(),
           summary: boolean(),
+          numstat: boolean(),
           cached: boolean(),
           index: boolean(),
           reverse: boolean(),
@@ -27,6 +28,7 @@ defmodule Git.Commands.Apply do
             check: false,
             stat: false,
             summary: false,
+            numstat: false,
             cached: false,
             index: false,
             reverse: false,
@@ -47,6 +49,9 @@ defmodule Git.Commands.Apply do
       iex> Git.Commands.Apply.args(%Git.Commands.Apply{patch: "fix.patch", stat: true, summary: true})
       ["apply", "--stat", "--summary", "fix.patch"]
 
+      iex> Git.Commands.Apply.args(%Git.Commands.Apply{patch: "fix.patch", numstat: true})
+      ["apply", "--numstat", "fix.patch"]
+
       iex> Git.Commands.Apply.args(%Git.Commands.Apply{patch: "fix.patch", cached: true})
       ["apply", "--cached", "fix.patch"]
 
@@ -60,13 +65,14 @@ defmodule Git.Commands.Apply do
   @spec args(t()) :: [String.t()]
   @impl true
   def args(%__MODULE__{} = command) do
-    info_mode = command.stat or command.summary or command.check
+    info_mode = command.stat or command.summary or command.numstat or command.check
     Process.put(@mode_key, info_mode)
 
     ["apply"]
     |> maybe_add(command.check, "--check")
     |> maybe_add(command.stat, "--stat")
     |> maybe_add(command.summary, "--summary")
+    |> maybe_add(command.numstat, "--numstat")
     |> maybe_add(command.cached, "--cached")
     |> maybe_add(command.index, "--index")
     |> maybe_add(command.reverse, "--reverse")
