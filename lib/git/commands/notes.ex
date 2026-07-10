@@ -3,8 +3,14 @@ defmodule Git.Commands.Notes do
   Implements the `Git.Command` behaviour for `git notes`.
 
   Supports listing notes, showing a note for a specific ref, adding notes,
-  appending to existing notes, removing notes, and pruning notes for
-  unreachable objects.
+  appending to existing notes, copying a note from one object to another,
+  merging a notes ref, removing notes, and pruning notes for unreachable
+  objects.
+
+  `:copy` carries a note across a new commit (for example after a squash-merge
+  or cherry-pick, which produce new SHAs that `notes.rewriteRef` does not
+  cover). `:merge` folds another notes ref into the current one, which is git's
+  remedy for concurrent writers to a single ref.
 
   Edit mode (`git notes edit`) is intentionally not supported because it
   launches an interactive editor which cannot be driven programmatically.
@@ -22,6 +28,9 @@ defmodule Git.Commands.Notes do
           force: boolean(),
           remove: String.t() | nil,
           prune: boolean(),
+          copy: {String.t(), String.t()} | nil,
+          merge: String.t() | nil,
+          strategy: String.t() | nil,
           notes_ref: String.t() | nil
         }
 
@@ -34,6 +43,9 @@ defmodule Git.Commands.Notes do
             force: false,
             remove: nil,
             prune: false,
+            copy: nil,
+            merge: nil,
+            strategy: nil,
             notes_ref: nil
 
   # Process dictionary key used to communicate the operation mode from args/1
@@ -66,6 +78,15 @@ defmodule Git.Commands.Notes do
 
       iex> Git.Commands.Notes.args(%Git.Commands.Notes{prune: true})
       ["notes", "prune"]
+
+      iex> Git.Commands.Notes.args(%Git.Commands.Notes{copy: {"HEAD~1", "HEAD"}})
+      ["notes", "copy", "HEAD~1", "HEAD"]
+
+      iex> Git.Commands.Notes.args(%Git.Commands.Notes{copy: {"a", "b"}, force: true})
+      ["notes", "copy", "-f", "a", "b"]
+
+      iex> Git.Commands.Notes.args(%Git.Commands.Notes{merge: "refs/notes/other", strategy: "union"})
+      ["notes", "merge", "-s", "union", "refs/notes/other"]
 
       iex> Git.Commands.Notes.args(%Git.Commands.Notes{notes_ref: "custom"})
       ["notes", "--ref=custom", "list"]
@@ -110,6 +131,28 @@ defmodule Git.Commands.Notes do
     base = ["notes"]
     base = maybe_add_notes_ref(base, command.notes_ref)
     base ++ ["prune"]
+  end
+
+  def args(%__MODULE__{copy: {from, to}} = command) do
+    Process.put(@mode_key, :mutation)
+
+    base = ["notes"]
+    base = maybe_add_notes_ref(base, command.notes_ref)
+
+    (base ++ ["copy"])
+    |> maybe_add_flag(command.force, "-f")
+    |> Kernel.++([from, to])
+  end
+
+  def args(%__MODULE__{merge: ref} = command) when is_binary(ref) do
+    Process.put(@mode_key, :mutation)
+
+    base = ["notes"]
+    base = maybe_add_notes_ref(base, command.notes_ref)
+
+    (base ++ ["merge"])
+    |> maybe_add_strategy(command.strategy)
+    |> Kernel.++([ref])
   end
 
   def args(%__MODULE__{show: ref} = command) when is_binary(ref) do
@@ -189,4 +232,7 @@ defmodule Git.Commands.Notes do
 
   defp maybe_add_notes_ref(args, nil), do: args
   defp maybe_add_notes_ref(args, ref) when is_binary(ref), do: args ++ ["--ref=#{ref}"]
+
+  defp maybe_add_strategy(args, nil), do: args
+  defp maybe_add_strategy(args, strategy) when is_binary(strategy), do: args ++ ["-s", strategy]
 end
