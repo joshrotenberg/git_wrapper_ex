@@ -48,12 +48,56 @@ defmodule Git.Diff do
   def parse(output) do
     lines = String.split(output, "\n", trim: true)
 
-    # Stat output has lines with " | " — detect by presence
-    if Enum.any?(lines, &String.contains?(&1, " | ")) do
-      parse_stat(lines, output)
-    else
-      # Full patch output: no file-level parsing, store raw
-      %__MODULE__{raw: output}
+    cond do
+      # Stat output has lines with " | "
+      Enum.any?(lines, &String.contains?(&1, " | ")) ->
+        parse_stat(lines, output)
+
+      # Numstat output has lines like "10\t5\tpath" (or "-\t-\tpath" for binary)
+      Enum.any?(lines, &numstat_line?/1) ->
+        parse_numstat(lines, output)
+
+      # Full patch (or name-only/name-status) output: no file-level parsing
+      true ->
+        %__MODULE__{raw: output}
+    end
+  end
+
+  @numstat_regex ~r/^(\d+|-)\t(\d+|-)\t/
+  defp numstat_line?(line), do: Regex.match?(@numstat_regex, line)
+
+  @spec parse_numstat([String.t()], String.t()) :: t()
+  defp parse_numstat(lines, raw) do
+    files =
+      lines
+      |> Enum.filter(&numstat_line?/1)
+      |> Enum.map(&parse_numstat_line/1)
+
+    total_ins = Enum.reduce(files, 0, fn file, acc -> acc + file.insertions end)
+    total_del = Enum.reduce(files, 0, fn file, acc -> acc + file.deletions end)
+
+    %__MODULE__{
+      files: files,
+      total_insertions: total_ins,
+      total_deletions: total_del,
+      raw: raw
+    }
+  end
+
+  @spec parse_numstat_line(String.t()) :: DiffFile.t()
+  defp parse_numstat_line(line) do
+    [ins, del, path] = String.split(line, "\t", parts: 3)
+
+    case {ins, del} do
+      {"-", "-"} ->
+        %DiffFile{path: path, binary: true}
+
+      _ ->
+        %DiffFile{
+          path: path,
+          insertions: String.to_integer(ins),
+          deletions: String.to_integer(del)
+        }
     end
   end
 

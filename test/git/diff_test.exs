@@ -106,6 +106,30 @@ defmodule Git.DiffTest do
       assert diff.files == []
       assert diff.raw == patch
     end
+
+    test "parses numstat output into exact per-file counts" do
+      output = "10\t5\tlib/foo.ex\n0\t3\tlib/bar.ex\n"
+      diff = Diff.parse(output)
+
+      assert length(diff.files) == 2
+      assert diff.total_insertions == 10
+      assert diff.total_deletions == 8
+
+      foo = Enum.find(diff.files, &(&1.path == "lib/foo.ex"))
+      assert foo.insertions == 10
+      assert foo.deletions == 5
+      refute foo.binary
+    end
+
+    test "parses numstat binary files as binary with zero counts" do
+      diff = Diff.parse("-\t-\timage.png\n")
+
+      file = hd(diff.files)
+      assert file.path == "image.png"
+      assert file.binary == true
+      assert diff.total_insertions == 0
+      assert diff.total_deletions == 0
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -149,6 +173,24 @@ defmodule Git.DiffTest do
     test "all options combined" do
       cmd = %DiffCmd{staged: true, stat: true, ref: "HEAD~1", path: "lib/"}
       assert DiffCmd.args(cmd) == ["diff", "--cached", "--stat", "HEAD~1", "--", "lib/"]
+    end
+
+    test "numstat adds --numstat" do
+      assert DiffCmd.args(%DiffCmd{numstat: true}) == ["diff", "--numstat"]
+    end
+
+    test "whitespace and rename flags" do
+      assert DiffCmd.args(%DiffCmd{ignore_all_space: true, find_renames: true}) ==
+               ["diff", "-w", "-M"]
+    end
+
+    test "unified and diff_filter" do
+      assert DiffCmd.args(%DiffCmd{unified: 0, diff_filter: "ACMR"}) ==
+               ["diff", "-U0", "--diff-filter=ACMR"]
+    end
+
+    test "reverse adds -R" do
+      assert DiffCmd.args(%DiffCmd{reverse: true}) == ["diff", "-R"]
     end
   end
 
@@ -227,6 +269,21 @@ defmodule Git.DiffTest do
 
       assert {:ok, diff} = Git.diff(config: config, ref: "HEAD~1", stat: true)
       assert diff.total_insertions > 0
+    end
+
+    test "numstat returns exact per-file insertion and deletion counts" do
+      {config, dir} = setup_repo()
+      make_commit(dir)
+
+      File.write!(Path.join(dir, "n.txt"), "a\nb\nc\n")
+      System.cmd("git", ["add", "n.txt"], cd: dir)
+
+      assert {:ok, diff} = Git.diff(config: config, staged: true, numstat: true)
+
+      file = Enum.find(diff.files, &(&1.path == "n.txt"))
+      assert file.insertions == 3
+      assert file.deletions == 0
+      assert diff.total_insertions == 3
     end
   end
 end
