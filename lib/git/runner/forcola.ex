@@ -114,7 +114,7 @@ if Code.ensure_loaded?(Forcola) do
         # merge_stderr routes stderr into the stdout stream, but fold any stray
         # stderr frame in too so the collected output matches the no-input path.
         tag in [Shim.tag_stdout(), Shim.tag_stderr()] ->
-          collect(port, [stdout_acc | payload], deadline)
+          collect(port, [stdout_acc, payload], deadline)
 
         tag == Shim.tag_exit() ->
           finish(Shim.decode_exit(payload), stdout_acc)

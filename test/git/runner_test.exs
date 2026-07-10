@@ -197,6 +197,25 @@ defmodule Git.RunnerTest do
                  input: "kept line\n\n\n"
                )
     end
+
+    test "assembles multi-frame stdout in arrival order" do
+      # Output large enough that the shim splits it across several frames, so
+      # the accumulator's ordering is actually exercised. stripspace passes
+      # non-blank lines through unchanged, so output must equal input exactly;
+      # any frame reordering would corrupt the sequence.
+      content =
+        0..4999
+        |> Enum.map_join(&"line-#{String.pad_leading(Integer.to_string(&1), 5, "0")}\n")
+
+      assert {:ok, {stdout, 0}} =
+               Forcola.run("git", ["stripspace"],
+                 timeout: 5000,
+                 stderr_to_stdout: true,
+                 input: content
+               )
+
+      assert stdout == content
+    end
   end
 
   # git's blob object id: SHA1 of "blob <byte_size>\0<content>". An independent
