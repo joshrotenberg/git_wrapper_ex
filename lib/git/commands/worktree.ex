@@ -2,9 +2,14 @@ defmodule Git.Commands.Worktree do
   @moduledoc """
   Implements the `Git.Command` behaviour for `git worktree`.
 
-  Supports listing worktrees (default), adding a new worktree, removing
-  a worktree, and pruning stale worktree information. List output is
+  Supports listing worktrees (default), adding a new worktree, removing,
+  moving, unlocking, repairing, and pruning worktrees. List output is
   always parsed from `--porcelain` format for reliable structured data.
+
+  When adding with a new branch (`:add_new_branch`), `:start_point` names the
+  commit-ish the branch starts from; `:add_branch` alone checks out an existing
+  branch. `:repair` (with no directory noise) is the companion to `:prune` for
+  recovering worktrees whose administrative files moved.
   """
 
   @behaviour Git.Command
@@ -16,8 +21,13 @@ defmodule Git.Commands.Worktree do
           add_path: String.t() | nil,
           add_branch: String.t() | nil,
           add_new_branch: String.t() | nil,
+          start_point: String.t() | nil,
           remove_path: String.t() | nil,
+          move: {String.t(), String.t()} | nil,
+          unlock: String.t() | nil,
+          repair: boolean(),
           prune: boolean(),
+          expire: String.t() | nil,
           force: boolean(),
           detach: boolean(),
           lock: boolean(),
@@ -28,8 +38,13 @@ defmodule Git.Commands.Worktree do
             add_path: nil,
             add_branch: nil,
             add_new_branch: nil,
+            start_point: nil,
             remove_path: nil,
+            move: nil,
+            unlock: nil,
+            repair: false,
             prune: false,
+            expire: nil,
             force: false,
             detach: false,
             lock: false,
@@ -43,9 +58,12 @@ defmodule Git.Commands.Worktree do
   @doc """
   Returns the argument list for `git worktree`.
 
-  - If `:add_path` is set, builds `git worktree add [options] <path> [<branch>]`.
+  - If `:add_path` is set, builds `git worktree add [options] <path> [<commit-ish>]`.
   - If `:remove_path` is set, builds `git worktree remove [--force] <path>`.
-  - If `:prune` is true, builds `git worktree prune`.
+  - If `:move` is a `{from, to}` tuple, builds `git worktree move [--force] <from> <to>`.
+  - If `:unlock` is set, builds `git worktree unlock <path>`.
+  - If `:repair` is true, builds `git worktree repair`.
+  - If `:prune` is true, builds `git worktree prune [--expire <time>]`.
   - Otherwise, lists worktrees with `git worktree list --porcelain`.
 
   ## Examples
@@ -56,11 +74,23 @@ defmodule Git.Commands.Worktree do
       iex> Git.Commands.Worktree.args(%Git.Commands.Worktree{add_path: "/tmp/wt", add_branch: "main"})
       ["worktree", "add", "/tmp/wt", "main"]
 
+      iex> Git.Commands.Worktree.args(%Git.Commands.Worktree{add_path: "/tmp/wt", add_new_branch: "feat", start_point: "main"})
+      ["worktree", "add", "-b", "feat", "/tmp/wt", "main"]
+
       iex> Git.Commands.Worktree.args(%Git.Commands.Worktree{remove_path: "/tmp/wt", force: true})
       ["worktree", "remove", "--force", "/tmp/wt"]
 
-      iex> Git.Commands.Worktree.args(%Git.Commands.Worktree{prune: true})
-      ["worktree", "prune"]
+      iex> Git.Commands.Worktree.args(%Git.Commands.Worktree{move: {"/tmp/wt", "/tmp/moved"}})
+      ["worktree", "move", "/tmp/wt", "/tmp/moved"]
+
+      iex> Git.Commands.Worktree.args(%Git.Commands.Worktree{unlock: "/tmp/wt"})
+      ["worktree", "unlock", "/tmp/wt"]
+
+      iex> Git.Commands.Worktree.args(%Git.Commands.Worktree{repair: true})
+      ["worktree", "repair"]
+
+      iex> Git.Commands.Worktree.args(%Git.Commands.Worktree{prune: true, expire: "now"})
+      ["worktree", "prune", "--expire", "now"]
 
   """
   @spec args(t()) :: [String.t()]
@@ -76,7 +106,7 @@ defmodule Git.Commands.Worktree do
     |> maybe_add_flag(command.lock, "--lock")
     |> maybe_add_option("-b", command.add_new_branch)
     |> Kernel.++([path])
-    |> maybe_add_value(command.add_branch)
+    |> maybe_add_value(command.start_point || command.add_branch)
   end
 
   def args(%__MODULE__{remove_path: path} = command) when is_binary(path) do
@@ -87,9 +117,29 @@ defmodule Git.Commands.Worktree do
     |> Kernel.++([path])
   end
 
-  def args(%__MODULE__{prune: true}) do
+  def args(%__MODULE__{move: {from, to}} = command) do
     Process.put(@mode_key, :mutation)
+
+    ["worktree", "move"]
+    |> maybe_add_flag(command.force, "--force")
+    |> Kernel.++([from, to])
+  end
+
+  def args(%__MODULE__{unlock: path}) when is_binary(path) do
+    Process.put(@mode_key, :mutation)
+    ["worktree", "unlock", path]
+  end
+
+  def args(%__MODULE__{repair: true}) do
+    Process.put(@mode_key, :mutation)
+    ["worktree", "repair"]
+  end
+
+  def args(%__MODULE__{prune: true} = command) do
+    Process.put(@mode_key, :mutation)
+
     ["worktree", "prune"]
+    |> maybe_add_option("--expire", command.expire)
   end
 
   def args(%__MODULE__{}) do
