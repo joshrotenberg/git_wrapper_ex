@@ -323,6 +323,34 @@ defmodule Git.WorkflowTest do
 
       {:ok, false} = Git.Branches.exists?("feat/to-delete", config: cfg)
     end
+
+    test "squash merge with :delete errors when the branch is held by a worktree" do
+      {tmp_dir, cfg} = setup_repo("squash_del_held")
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
+
+      {:ok, _} = Git.checkout(branch: "feat/held", create: true, config: cfg)
+      File.write!(Path.join(tmp_dir, "held.txt"), "content\n")
+      {:ok, :done} = Git.add(files: ["held.txt"], config: cfg)
+      {:ok, _} = Git.commit("feat: work on held", config: cfg)
+
+      {:ok, _} = Git.checkout(branch: "main", config: cfg)
+
+      # Hold feat/held in a separate worktree so git refuses to delete it.
+      wt = Path.join(tmp_dir, "wt-held")
+      System.cmd("git", ["worktree", "add", wt, "feat/held"], cd: tmp_dir)
+
+      assert {:error, {:branch_not_deleted, _reason}} =
+               Git.Workflow.squash_merge("feat/held",
+                 message: "feat: squashed",
+                 delete: true,
+                 config: cfg
+               )
+
+      # The squash commit still landed on main, and the branch was not deleted.
+      {:ok, commits} = Git.log(config: cfg)
+      assert hd(commits).subject == "feat: squashed"
+      assert {:ok, true} = Git.Branches.exists?("feat/held", config: cfg)
+    end
   end
 
   # ---------------------------------------------------------------------------
