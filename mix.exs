@@ -77,6 +77,7 @@ defmodule Git.MixProject do
           Git.GrepResult,
           Git.LsRemoteEntry,
           Git.MergeResult,
+          Git.MergeTreeResult,
           Git.PullResult,
           Git.RebaseResult,
           Git.ReflogEntry,

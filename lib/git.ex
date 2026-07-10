@@ -1438,6 +1438,38 @@ defmodule Git do
   end
 
   @doc """
+  Runs `git merge-tree --write-tree` to merge two commits in the object database.
+
+  Plumbing command. Performs a three-way merge of `branch1` and `branch2` with
+  no checkout, index, or working tree, and returns a `Git.MergeTreeResult` with
+  the merged tree SHA, whether the merge was clean, and any conflicted paths.
+  Useful for CI mergeability checks and server-side merges.
+
+  A merge with conflicts is returned as `{:ok, %Git.MergeTreeResult{clean:
+  false}}`, not an error. Requires git 2.38 or newer.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+
+  ## Examples
+
+      {:ok, result} = Git.merge_tree("main", "feature")
+      result.clean      #=> true
+      result.tree       #=> "5b12e6a..."
+      result.conflicts  #=> []
+
+  """
+  @spec merge_tree(String.t(), String.t(), keyword()) ::
+          {:ok, Git.MergeTreeResult.t()} | {:error, term()}
+  def merge_tree(branch1, branch2, opts \\ [])
+      when is_binary(branch1) and is_binary(branch2) do
+    {config, _rest} = Keyword.pop(opts, :config, Config.new())
+    command = %Git.Commands.MergeTree{branch1: branch1, branch2: branch2}
+    Git.Command.run(Git.Commands.MergeTree, command, config)
+  end
+
+  @doc """
   Runs `git cherry` to find commits not yet applied upstream.
 
   Returns a list of `Git.CherryEntry` structs. Each entry indicates
