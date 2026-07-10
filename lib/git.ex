@@ -242,6 +242,85 @@ defmodule Git do
   end
 
   @doc """
+  Runs `git diff-tree` (raw plumbing) to compare two trees.
+
+  Emits `--raw -z` and parses each record into a `Git.DiffRawEntry`. With a
+  single tree-ish, diffs a commit against its first parent (the leading
+  commit-id header git prints is skipped).
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:tree_ish` - the first (or only) tree-ish to diff (default `"HEAD"`)
+    * `:tree_ish2` - a second tree-ish; when set, diffs `tree_ish tree_ish2`
+    * `:recursive` - recurse into subtrees (`-r`, default `false`)
+    * `:find_renames` - detect renames (`-M`, default `false`)
+
+  ## Examples
+
+      Git.diff_tree(tree_ish: "HEAD~1", tree_ish2: "HEAD", recursive: true)
+      Git.diff_tree(tree_ish: "HEAD")
+
+  """
+  @spec diff_tree(keyword()) :: {:ok, [Git.DiffRawEntry.t()]} | {:error, term()}
+  def diff_tree(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.DiffTree, rest)
+    Git.Command.run(Git.Commands.DiffTree, command, config)
+  end
+
+  @doc """
+  Runs `git diff-index` (raw plumbing) to compare a tree-ish to the index and
+  working tree.
+
+  In the default (raw) mode, emits `--raw -z` and returns
+  `{:ok, [Git.DiffRawEntry.t()]}`. With `:quiet`, runs as a dirty-check:
+  returns `{:ok, true}` when there are differences and `{:ok, false}` when
+  there are none.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:tree_ish` - the tree-ish to compare against (default `"HEAD"`)
+    * `:cached` - compare against the index only (`--cached`, default `false`)
+    * `:quiet` - dirty-check mode returning a boolean (`--quiet`, default `false`)
+
+  ## Examples
+
+      Git.diff_index(cached: true)
+      Git.diff_index(quiet: true)
+
+  """
+  @spec diff_index(keyword()) ::
+          {:ok, [Git.DiffRawEntry.t()] | boolean()} | {:error, term()}
+  def diff_index(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.DiffIndex, rest)
+    Git.Command.run(Git.Commands.DiffIndex, command, config)
+  end
+
+  @doc """
+  Runs `git diff-files` (raw plumbing) to compare the working tree to the index.
+
+  Emits `--raw -z` and returns `{:ok, [Git.DiffRawEntry.t()]}`.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+
+  ## Examples
+
+      Git.diff_files()
+
+  """
+  @spec diff_files(keyword()) :: {:ok, [Git.DiffRawEntry.t()]} | {:error, term()}
+  def diff_files(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.DiffFiles, rest)
+    Git.Command.run(Git.Commands.DiffFiles, command, config)
+  end
+
+  @doc """
   Runs `git remote` to list, add, or remove remotes.
 
   ## Options
