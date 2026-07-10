@@ -43,6 +43,11 @@ defmodule Git.Commands.BranchTest do
       assert Branch.args(%Branch{create: "feat/new"}) == ["branch", "feat/new"]
     end
 
+    test "create branch from a start point" do
+      assert Branch.args(%Branch{create: "feat/new", start_point: "HEAD~1"}) ==
+               ["branch", "feat/new", "HEAD~1"]
+    end
+
     test "delete branch" do
       assert Branch.args(%Branch{delete: "old"}) == ["branch", "-d", "old"]
     end
@@ -94,6 +99,26 @@ defmodule Git.Commands.BranchTest do
       assert {:ok, branches} = Git.branch(config: config)
       names = Enum.map(branches, & &1.name)
       refute "test-branch" in names
+    end
+
+    test "create a branch from an earlier start point", %{tmp_dir: tmp_dir, config: config} do
+      # setup produced the "initial" commit; add a second commit so HEAD~1 differs.
+      System.cmd("git", ["commit", "--allow-empty", "-m", "second"], cd: tmp_dir)
+
+      {head_hash, 0} = System.cmd("git", ["rev-parse", "HEAD"], cd: tmp_dir)
+      head_hash = String.trim(head_hash)
+
+      {older_hash, 0} = System.cmd("git", ["rev-parse", "HEAD~1"], cd: tmp_dir)
+      older_hash = String.trim(older_hash)
+
+      assert {:ok, :done} =
+               Git.branch(create: "old", start_point: "HEAD~1", config: config)
+
+      {branch_hash, 0} = System.cmd("git", ["rev-parse", "old"], cd: tmp_dir)
+      branch_hash = String.trim(branch_hash)
+
+      assert branch_hash == older_hash
+      refute branch_hash == head_hash
     end
 
     test "list merged branches", %{tmp_dir: tmp_dir, config: config} do

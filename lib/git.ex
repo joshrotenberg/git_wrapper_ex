@@ -195,6 +195,7 @@ defmodule Git do
 
     * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
     * `:create` - name of a new branch to create
+    * `:start_point` - commit/ref to create the branch from when using `:create` (default `nil`)
     * `:delete` - name of a branch to delete
     * `:force_delete` - use `-D` for delete (default `false`)
     * `:all` - include remote-tracking branches in the listing (default `false`)
@@ -294,6 +295,7 @@ defmodule Git do
     * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
     * `:branch` - name of the branch to switch to
     * `:create` - when `true`, creates the branch before switching (`-b` flag, default `false`)
+    * `:start_point` - commit/ref to create the branch from when using `:create` (default `nil`)
     * `:files` - list of file paths to restore from the index (default `[]`)
 
   """
@@ -1847,6 +1849,7 @@ defmodule Git do
     * `:branch` - branch name to switch to
     * `:create` - create a new branch and switch to it (`-c`)
     * `:force_create` - create or reset a branch and switch to it (`-C`)
+    * `:start_point` - commit/ref to create the branch from when using `:create`/`:force_create` (default `nil`)
     * `:detach` - switch to a commit in detached HEAD state (`--detach`)
     * `:force` - force switch even with uncommitted changes (`--force`)
     * `:discard_changes` - discard local changes (`--discard-changes`)

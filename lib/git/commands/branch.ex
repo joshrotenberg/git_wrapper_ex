@@ -13,6 +13,7 @@ defmodule Git.Commands.Branch do
   @type t :: %__MODULE__{
           list: boolean(),
           create: String.t() | nil,
+          start_point: String.t() | nil,
           delete: String.t() | nil,
           force_delete: boolean(),
           all: boolean(),
@@ -24,6 +25,7 @@ defmodule Git.Commands.Branch do
 
   defstruct list: true,
             create: nil,
+            start_point: nil,
             delete: nil,
             force_delete: false,
             all: false,
@@ -35,7 +37,7 @@ defmodule Git.Commands.Branch do
   @doc """
   Returns the argument list for `git branch`.
 
-  - If `:create` is set, builds `git branch <name>`.
+  - If `:create` is set, builds `git branch <name>` (appending `:start_point` when set).
   - If `:delete` is set, builds `git branch -d <name>` (or `-D` with `force_delete: true`).
   - Otherwise, lists branches with `-vv` and optionally `--all`.
 
@@ -47,12 +49,19 @@ defmodule Git.Commands.Branch do
       iex> Git.Commands.Branch.args(%Git.Commands.Branch{create: "feat/new"})
       ["branch", "feat/new"]
 
+      iex> Git.Commands.Branch.args(%Git.Commands.Branch{create: "feat/new", start_point: "HEAD~1"})
+      ["branch", "feat/new", "HEAD~1"]
+
       iex> Git.Commands.Branch.args(%Git.Commands.Branch{delete: "old", force_delete: true})
       ["branch", "-D", "old"]
 
   """
   @spec args(t()) :: [String.t()]
   @impl true
+  def args(%__MODULE__{create: name, start_point: start_point})
+      when is_binary(name) and is_binary(start_point),
+      do: ["branch", name, start_point]
+
   def args(%__MODULE__{create: name}) when is_binary(name), do: ["branch", name]
 
   def args(%__MODULE__{delete: name, force_delete: true}) when is_binary(name),
