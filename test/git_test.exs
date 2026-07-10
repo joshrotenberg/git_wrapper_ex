@@ -10,9 +10,17 @@ defmodule GitTest do
 
   defp setup_repo do
     dir = Path.join(System.tmp_dir!(), "git_wrapper_test_#{:erlang.unique_integer([:positive])}")
-    File.mkdir_p!(dir)
 
-    System.cmd("git", ["init"], cd: dir)
+    # `:erlang.unique_integer/1` restarts its sequence on each BEAM run, so these
+    # paths recur across `mix test` invocations. Wipe any directory a previous run
+    # left behind before creating this one, otherwise a stale working tree or
+    # history (`git init` is idempotent and preserves both) leaks into a test that
+    # expects a fresh repo. `on_exit` then keeps the temp dir from accumulating.
+    Git.TestHelpers.rm_rf(dir)
+    File.mkdir_p!(dir)
+    on_exit(fn -> Git.TestHelpers.rm_rf(dir) end)
+
+    System.cmd("git", ["init", "--initial-branch=main"], cd: dir)
     System.cmd("git", ["config", "user.email", "test@example.com"], cd: dir)
     System.cmd("git", ["config", "user.name", "Test User"], cd: dir)
 
