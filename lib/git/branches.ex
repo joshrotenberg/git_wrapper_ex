@@ -295,9 +295,93 @@ defmodule Git.Branches do
     end
   end
 
+  @doc """
+  Finds local branches whose changes were squash-merged into a target and
+  deletes them.
+
+  A squash-merge collapses a branch's commits into a single new commit on the
+  target, so the branch never becomes an ancestor of the target and
+  `git branch --merged` (and therefore `cleanup_merged/1`) never reports it.
+  This uses the standard cherry-based heuristic instead: for each candidate
+  branch `b`, it builds a synthetic commit carrying `b`'s tree on top of the
+  merge-base with the target, then asks `git cherry` whether an equivalent
+  change already exists in the target. If it does, `b` was squash-merged.
+
+  Because detection is a heuristic and deletion uses `git branch -D` (force),
+  this defaults to `:dry_run` `true`: it returns the branches that *would* be
+  deleted and touches nothing. Pass `dry_run: false` to actually delete.
+
+  ## Options
+
+    * `:target` - branch to check against (default: the current branch)
+    * `:exclude` - branch names to never delete
+      (default: `["main", "master", "develop"]`)
+    * `:dry_run` - return the branches that would be deleted without deleting
+      them (default: `true`)
+    * `:config` - a `Git.Config` struct
+
+  The current branch and the target branch are always skipped.
+
+  Returns `{:ok, deleted_names}` (or the would-be-deleted names under
+  `:dry_run`).
+  """
+  @spec delete_squashed(keyword()) :: {:ok, [String.t()]} | {:error, term()}
+  def delete_squashed(opts \\ []) do
+    {target, opts} = Keyword.pop(opts, :target)
+    {exclude, opts} = Keyword.pop(opts, :exclude, ["main", "master", "develop"])
+    {dry_run, opts} = Keyword.pop(opts, :dry_run, true)
+    config = Keyword.get(opts, :config, Config.new())
+
+    with {:ok, current_name} <- current(opts),
+         {:ok, branches} <- local_branches(opts) do
+      target = target || current_name
+
+      to_delete =
+        branches
+        |> Enum.reject(&(&1 == current_name or &1 == target or &1 in exclude))
+        |> Enum.filter(&squashed_into?(target, &1, config))
+
+      if dry_run do
+        {:ok, to_delete}
+      else
+        delete_branches(to_delete, opts, true)
+      end
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # Private helpers
   # ---------------------------------------------------------------------------
+
+  # Cherry-based squash-merge detection. Builds a synthetic commit that puts
+  # `branch`'s tree on top of its merge-base with `target`, then checks whether
+  # `git cherry` reports an equivalent change already present in `target` (a
+  # line prefixed with "-", which `Git.CherryEntry` records as `applied: true`).
+  # Any error in the pipeline is treated as "not squashed" so one odd branch
+  # (e.g. unrelated histories with no merge-base) never fails the whole run.
+  defp squashed_into?(target, branch, config) do
+    with {:ok, merge_base} <- Git.merge_base(commits: [target, branch], config: config),
+         {:ok, tree} <- Git.rev_parse(ref: "#{branch}^{tree}", config: config),
+         {:ok, synth} <-
+           Git.commit_tree(tree: tree, parents: [merge_base], message: "_", config: config),
+         {:ok, entries} <- Git.cherry(upstream: target, head: synth, config: config) do
+      Enum.any?(entries, & &1.applied)
+    else
+      _ -> false
+    end
+  end
+
+  defp local_branches(opts) do
+    config = Keyword.get(opts, :config, Config.new())
+    args = ["for-each-ref", "--format=%(refname:short)", "refs/heads/"]
+    {stdout, exit_code} = System.cmd(config.binary, args, Config.cmd_opts(config))
+
+    if exit_code == 0 do
+      {:ok, String.split(stdout, "\n", trim: true)}
+    else
+      {:error, {stdout, exit_code}}
+    end
+  end
 
   defp delete_branches(to_delete, opts, force) do
     Enum.each(to_delete, fn name ->
