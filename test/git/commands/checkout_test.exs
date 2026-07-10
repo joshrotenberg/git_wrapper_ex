@@ -183,6 +183,14 @@ defmodule Git.CheckoutTest do
              }) == ["checkout", "-b", "feat/new"]
     end
 
+    test "builds args for branch create from a start point" do
+      assert Git.Commands.Checkout.args(%Git.Commands.Checkout{
+               branch: "feat/new",
+               create: true,
+               start_point: "HEAD~1"
+             }) == ["checkout", "-b", "feat/new", "HEAD~1"]
+    end
+
     test "builds args for file restore" do
       assert Git.Commands.Checkout.args(%Git.Commands.Checkout{
                files: ["README.md", "lib/foo.ex"]

@@ -113,6 +113,14 @@ defmodule Git.SwitchTest do
                ["switch", "-c", "feat/new"]
     end
 
+    test "builds args for branch create from a start point" do
+      assert Switch.args(%Switch{
+               branch: "feat/new",
+               create: true,
+               start_point: "HEAD~1"
+             }) == ["switch", "-c", "feat/new", "HEAD~1"]
+    end
+
     test "builds args for force create" do
       assert Switch.args(%Switch{
                branch: "feat/new",

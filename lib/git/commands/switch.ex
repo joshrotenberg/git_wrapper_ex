@@ -15,6 +15,7 @@ defmodule Git.Commands.Switch do
           branch: String.t() | nil,
           create: boolean(),
           force_create: boolean(),
+          start_point: String.t() | nil,
           detach: boolean(),
           force: boolean(),
           discard_changes: boolean(),
@@ -27,6 +28,7 @@ defmodule Git.Commands.Switch do
   defstruct branch: nil,
             create: false,
             force_create: false,
+            start_point: nil,
             detach: false,
             force: false,
             discard_changes: false,
@@ -46,6 +48,9 @@ defmodule Git.Commands.Switch do
       iex> Git.Commands.Switch.args(%Git.Commands.Switch{branch: "feat/new", create: true})
       ["switch", "-c", "feat/new"]
 
+      iex> Git.Commands.Switch.args(%Git.Commands.Switch{branch: "feat/new", create: true, start_point: "HEAD~1"})
+      ["switch", "-c", "feat/new", "HEAD~1"]
+
       iex> Git.Commands.Switch.args(%Git.Commands.Switch{branch: "abc123", detach: true})
       ["switch", "--detach", "abc123"]
 
@@ -53,7 +58,7 @@ defmodule Git.Commands.Switch do
   @spec args(t()) :: [String.t()]
   @impl true
   def args(%__MODULE__{} = cmd) do
-    ["switch"] ++ build_flags(cmd) ++ build_branch(cmd)
+    ["switch"] ++ build_flags(cmd) ++ build_branch(cmd) ++ build_start_point(cmd)
   end
 
   defp build_flags(%__MODULE__{} = cmd) do
@@ -72,6 +77,9 @@ defmodule Git.Commands.Switch do
 
   defp build_branch(%__MODULE__{branch: nil}), do: []
   defp build_branch(%__MODULE__{branch: branch}), do: [branch]
+
+  defp build_start_point(%__MODULE__{start_point: nil}), do: []
+  defp build_start_point(%__MODULE__{start_point: start_point}), do: [start_point]
 
   defp maybe_add(list, true, flag), do: list ++ [flag]
   defp maybe_add(list, _, _flag), do: list
