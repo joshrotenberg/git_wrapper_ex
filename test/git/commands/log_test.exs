@@ -2,6 +2,7 @@ defmodule Git.LogTest do
   use ExUnit.Case, async: true
 
   alias Git.{Commit, Config}
+  alias Git.Commands.Log
 
   setup do
     tmp_dir =
@@ -136,6 +137,99 @@ defmodule Git.LogTest do
       Enum.each(commits, fn commit ->
         assert commit.body == ""
       end)
+    end
+  end
+
+  describe "Git.Commands.Log args/1" do
+    test "adds --follow, --no-merges, and --first-parent" do
+      args = Log.args(%Log{follow: true, no_merges: true, first_parent: true})
+
+      assert "--follow" in args
+      assert "--no-merges" in args
+      assert "--first-parent" in args
+    end
+
+    test "adds grep modifiers and --committer" do
+      args =
+        Log.args(%Log{
+          grep: "fix",
+          regexp_ignore_case: true,
+          invert_grep: true,
+          committer: "alice"
+        })
+
+      assert "--grep=fix" in args
+      assert "-i" in args
+      assert "--invert-grep" in args
+      assert "--committer=alice" in args
+    end
+
+    test "adds --skip, --reverse, and ref selectors" do
+      args = Log.args(%Log{skip: 5, reverse: true, all: true, branches: true, tags: true})
+
+      assert "--skip=5" in args
+      assert "--reverse" in args
+      assert "--all" in args
+      assert "--branches" in args
+      assert "--tags" in args
+    end
+  end
+
+  describe "log history controls (integration)" do
+    test "reverse returns commits oldest first", %{config: config} do
+      assert {:ok, commits} = Git.log(config: config, reverse: true)
+      assert Enum.map(commits, & &1.subject) == ["first commit", "second commit", "third commit"]
+    end
+
+    test "skip omits the newest commits", %{config: config} do
+      assert {:ok, all} = Git.log(config: config)
+      assert {:ok, skipped} = Git.log(config: config, skip: 1)
+
+      assert length(skipped) == length(all) - 1
+      assert hd(skipped).subject == "second commit"
+    end
+
+    test "no_merges excludes a merge commit", %{tmp_dir: tmp_dir, config: config} do
+      System.cmd("git", ["checkout", "-b", "feature"], cd: tmp_dir)
+
+      System.cmd(
+        "git",
+        [
+          "-c",
+          "user.name=T",
+          "-c",
+          "user.email=t@t.com",
+          "commit",
+          "--allow-empty",
+          "-m",
+          "on feature"
+        ],
+        cd: tmp_dir
+      )
+
+      System.cmd("git", ["checkout", "main"], cd: tmp_dir)
+
+      System.cmd(
+        "git",
+        [
+          "-c",
+          "user.name=T",
+          "-c",
+          "user.email=t@t.com",
+          "merge",
+          "--no-ff",
+          "-m",
+          "merge feature",
+          "feature"
+        ],
+        cd: tmp_dir
+      )
+
+      {:ok, with_merge} = Git.log(config: config)
+      {:ok, without_merge} = Git.log(config: config, no_merges: true)
+
+      assert "merge feature" in Enum.map(with_merge, & &1.subject)
+      refute "merge feature" in Enum.map(without_merge, & &1.subject)
     end
   end
 end
