@@ -2405,4 +2405,130 @@ defmodule Git do
     command = struct!(Git.Commands.WriteTree, rest)
     Git.Command.run(Git.Commands.WriteTree, command, config)
   end
+
+  @doc """
+  Runs `git --version` and returns a parsed `Git.Version` struct.
+
+  Useful for gating behavior on the installed git version.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+
+  ## Examples
+
+      {:ok, v} = Git.version()
+      v.major #=> 2
+      v.raw   #=> "git version 2.50.1 (Apple Git-155)"
+
+  """
+  @spec version(keyword()) :: {:ok, Git.Version.t()} | {:error, term()}
+  def version(opts \\ []) do
+    {config, _rest} = Keyword.pop(opts, :config, Config.new())
+    Git.Command.run(Git.Commands.Version, %Git.Commands.Version{}, config)
+  end
+
+  @doc """
+  Runs `git count-objects -v` and returns a parsed `Git.CountObjects` struct.
+
+  Reports loose- and packed-object counts and on-disk sizes (sizes in KiB).
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+
+  ## Examples
+
+      {:ok, stats} = Git.count_objects()
+      stats.count    #=> 3
+      stats.in_pack  #=> 0
+
+  """
+  @spec count_objects(keyword()) :: {:ok, Git.CountObjects.t()} | {:error, term()}
+  def count_objects(opts \\ []) do
+    {config, _rest} = Keyword.pop(opts, :config, Config.new())
+    Git.Command.run(Git.Commands.CountObjects, %Git.Commands.CountObjects{}, config)
+  end
+
+  @doc """
+  Runs `git var` to read git's logical variables.
+
+  With no `:name`, runs `git var -l` and returns a map of every variable to its
+  value. With `:name`, looks up a single variable and returns its value string.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:name` - a single variable to look up (e.g., `"GIT_EDITOR"`)
+
+  ## Examples
+
+      {:ok, vars} = Git.var()
+      vars["init.defaultbranch"] #=> "main"
+
+      {:ok, editor} = Git.var(name: "GIT_EDITOR")
+
+  """
+  @spec var(keyword()) :: {:ok, map() | String.t()} | {:error, term()}
+  def var(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.Var, rest)
+    Git.Command.run(Git.Commands.Var, command, config)
+  end
+
+  @doc """
+  Runs `git name-rev` to find a symbolic name for a commit.
+
+  Returns the symbolic name string. With `:name_only` the output is just the
+  name; otherwise git prefixes it with the input revision.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:commit` - the commit to name (required)
+    * `:name_only` - print only the name, without the input (`--name-only`)
+    * `:tags` - only use tags to name the commit (`--tags`)
+
+  ## Examples
+
+      Git.name_rev(commit: "HEAD", name_only: true)
+      Git.name_rev(commit: "abc123", name_only: true, tags: true)
+
+  """
+  @spec name_rev(keyword()) :: {:ok, String.t()} | {:error, term()}
+  def name_rev(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.NameRev, rest)
+    Git.Command.run(Git.Commands.NameRev, command, config)
+  end
+
+  @doc """
+  Runs `git check-ref-format` to validate (and optionally normalize) a ref.
+
+  Returns `{:ok, true}` for a valid ref, `{:ok, normalized}` when `:normalize`
+  or `:branch` is set (the normalized/expanded ref), or `{:error, :invalid_ref}`
+  when the ref is not well-formed.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct (default: `Git.Config.new()`)
+    * `:ref` - the ref (or branch shorthand) to check (required)
+    * `:normalize` - normalize the ref and print it (`--normalize`)
+    * `:branch` - validate a branch-name shorthand (`--branch`)
+    * `:allow_onelevel` - accept single-level refs like `HEAD` (`--allow-onelevel`)
+
+  ## Examples
+
+      Git.check_ref_format(ref: "refs/heads/main")            #=> {:ok, true}
+      Git.check_ref_format(ref: "refs/heads//main", normalize: true)
+      Git.check_ref_format(ref: "bad name")                   #=> {:error, :invalid_ref}
+
+  """
+  @spec check_ref_format(keyword()) ::
+          {:ok, true | String.t()} | {:error, :invalid_ref | term()}
+  def check_ref_format(opts \\ []) do
+    {config, rest} = Keyword.pop(opts, :config, Config.new())
+    command = struct!(Git.Commands.CheckRefFormat, rest)
+    Git.Command.run(Git.Commands.CheckRefFormat, command, config)
+  end
 end
