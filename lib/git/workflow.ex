@@ -196,9 +196,130 @@ defmodule Git.Workflow do
     end
   end
 
+  @doc """
+  Moves `HEAD` back by `:count` commits, returning the commits that were undone.
+
+  This is the "I did not mean to commit that" helper. It captures the commits
+  being undone first, then resets. `:mode` controls what happens to their
+  changes:
+
+    * `:soft` (default) - keep the changes staged
+    * `:mixed` - keep the changes in the working tree, unstaged
+    * `:hard` - discard the changes (irreversible beyond the reflog)
+
+  ## Options
+
+    * `:count` - number of commits to undo (default `1`)
+    * `:mode` - `:soft` (default), `:mixed`, or `:hard`
+    * `:config` - a `Git.Config` struct
+
+  Returns `{:ok, undone_commits}` where `undone_commits` is the list of
+  `Git.Commit` structs that were on top of the new `HEAD`, or
+  `{:error, :cannot_undo_root}` when there is not enough history to move back
+  that far (you cannot reset past the root commit).
+  """
+  @spec undo_last_commit(keyword()) :: {:ok, [Git.Commit.t()]} | {:error, term()}
+  def undo_last_commit(opts \\ []) do
+    {config_kw, rest} = Keyword.split(opts, [:config])
+    count = Keyword.get(rest, :count, 1)
+    mode = Keyword.get(rest, :mode, :soft)
+
+    with {:ok, undone} <- undoable_commits(count, config_kw),
+         {:ok, :done} <-
+           Git.reset(Keyword.merge(config_kw, mode: mode, ref: "HEAD~#{count}")) do
+      {:ok, undone}
+    end
+  end
+
+  @doc """
+  Collapses the last `count` commits on the current branch into a single new
+  commit with `message`.
+
+  Soft-resets to `HEAD~count` (keeping all their changes staged) and commits
+  them as one. This is the only in-place squash in the library, since
+  interactive rebase is intentionally not wrapped. `count` must be at least 2.
+
+  Rewrites current-branch history; recover the originals from the reflog if
+  needed.
+
+  ## Options
+
+    * `:config` - a `Git.Config` struct
+    * All other options are forwarded to `Git.commit/2`.
+
+  Returns `{:ok, commit_result}`, or `{:error, :cannot_undo_root}` when there
+  are not enough commits to squash that many.
+  """
+  @spec squash_last(pos_integer(), String.t(), keyword()) ::
+          {:ok, Git.CommitResult.t()} | {:error, term()}
+  def squash_last(count, message, opts \\ [])
+      when is_integer(count) and count >= 2 and is_binary(message) do
+    {config_kw, rest} = Keyword.split(opts, [:config])
+
+    with {:ok, _undone} <- undoable_commits(count, config_kw),
+         {:ok, :done} <- Git.reset(Keyword.merge(config_kw, mode: :soft, ref: "HEAD~#{count}")) do
+      Git.commit(message, Keyword.merge(config_kw, rest))
+    end
+  end
+
+  @doc """
+  Returns the working tree to a pristine committed state.
+
+  Hard-resets tracked changes and removes untracked files and directories, so
+  both halves of a dirty tree are cleared (a `reset --hard` leaves untracked
+  files, a `clean` leaves tracked modifications; you need both).
+
+  Destructive: discarded untracked and ignored files are not recoverable.
+  Preview first with `dry_run: true`.
+
+  ## Options
+
+    * `:ignored` - also remove ignored files (`clean -x`, default `false`)
+    * `:dry_run` - do not change anything; return the untracked/ignored files
+      that would be removed (default `false`)
+    * `:config` - a `Git.Config` struct
+
+  Returns `{:ok, :discarded}` after clearing the tree, or
+  `{:ok, {:dry_run, paths}}` when `:dry_run` is set.
+  """
+  @spec discard_all(keyword()) ::
+          {:ok, :discarded} | {:ok, {:dry_run, [String.t()]}} | {:error, term()}
+  def discard_all(opts \\ []) do
+    {config_kw, rest} = Keyword.split(opts, [:config])
+    ignored = Keyword.get(rest, :ignored, false)
+    dry_run = Keyword.get(rest, :dry_run, false)
+
+    discard(dry_run, ignored, config_kw)
+  end
+
   # ---------------------------------------------------------------------------
   # Private helpers
   # ---------------------------------------------------------------------------
+
+  # Needs count+1 commits so HEAD~count is a valid reset target; returns the top
+  # `count` commits (the ones that will be moved off HEAD).
+  defp undoable_commits(count, config_kw) do
+    case Git.log(Keyword.merge(config_kw, max_count: count + 1)) do
+      {:ok, commits} when length(commits) >= count + 1 -> {:ok, Enum.take(commits, count)}
+      {:ok, _too_few} -> {:error, :cannot_undo_root}
+      {:error, _} = error -> error
+    end
+  end
+
+  defp discard(true, ignored, config_kw) do
+    case Git.clean(Keyword.merge(config_kw, dry_run: true, directories: true, ignored: ignored)) do
+      {:ok, paths} -> {:ok, {:dry_run, paths}}
+      {:error, _} = error -> error
+    end
+  end
+
+  defp discard(false, ignored, config_kw) do
+    with {:ok, :done} <- Git.reset(Keyword.merge(config_kw, mode: :hard)),
+         {:ok, _removed} <-
+           Git.clean(Keyword.merge(config_kw, force: true, directories: true, ignored: ignored)) do
+      {:ok, :discarded}
+    end
+  end
 
   defp run_on_branch(fun, config_kw, original_branch) do
     case fun.(config_kw) do

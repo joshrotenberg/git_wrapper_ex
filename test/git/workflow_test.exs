@@ -413,4 +413,96 @@ defmodule Git.WorkflowTest do
       assert status.entries == []
     end
   end
+
+  describe "undo_last_commit/1" do
+    test "moves HEAD back one commit and keeps changes staged (soft)" do
+      {tmp_dir, cfg} = setup_repo("undo_soft")
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
+
+      File.write!(Path.join(tmp_dir, "a.txt"), "a\n")
+      {:ok, :done} = Git.add(files: ["a.txt"], config: cfg)
+      {:ok, _} = Git.commit("feat: add a", config: cfg)
+
+      assert {:ok, [undone]} = Git.Workflow.undo_last_commit(config: cfg)
+      assert undone.subject == "feat: add a"
+
+      {:ok, commits} = Git.log(config: cfg)
+      assert length(commits) == 1
+      assert hd(commits).subject == "initial"
+
+      {:ok, status} = Git.status(config: cfg)
+      assert Enum.any?(status.entries, &(&1.path == "a.txt" and &1.index == "A"))
+    end
+
+    test "hard mode discards the changes" do
+      {tmp_dir, cfg} = setup_repo("undo_hard")
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
+
+      File.write!(Path.join(tmp_dir, "b.txt"), "b\n")
+      {:ok, :done} = Git.add(files: ["b.txt"], config: cfg)
+      {:ok, _} = Git.commit("feat: add b", config: cfg)
+
+      assert {:ok, [_]} = Git.Workflow.undo_last_commit(mode: :hard, config: cfg)
+      refute File.exists?(Path.join(tmp_dir, "b.txt"))
+    end
+
+    test "returns cannot_undo_root when there is not enough history" do
+      {tmp_dir, cfg} = setup_repo("undo_root")
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
+
+      assert {:error, :cannot_undo_root} = Git.Workflow.undo_last_commit(config: cfg)
+    end
+  end
+
+  describe "squash_last/3" do
+    test "collapses the last N commits into one" do
+      {tmp_dir, cfg} = setup_repo("squash_last")
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
+
+      File.write!(Path.join(tmp_dir, "1.txt"), "1\n")
+      {:ok, :done} = Git.add(files: ["1.txt"], config: cfg)
+      {:ok, _} = Git.commit("wip: one", config: cfg)
+      File.write!(Path.join(tmp_dir, "2.txt"), "2\n")
+      {:ok, :done} = Git.add(files: ["2.txt"], config: cfg)
+      {:ok, _} = Git.commit("wip: two", config: cfg)
+
+      assert {:ok, result} = Git.Workflow.squash_last(2, "feat: combined", config: cfg)
+      assert result.subject == "feat: combined"
+
+      {:ok, commits} = Git.log(config: cfg)
+      assert Enum.map(commits, & &1.subject) == ["feat: combined", "initial"]
+      assert File.exists?(Path.join(tmp_dir, "1.txt"))
+      assert File.exists?(Path.join(tmp_dir, "2.txt"))
+    end
+  end
+
+  describe "discard_all/1" do
+    test "resets tracked changes and removes untracked files" do
+      {tmp_dir, cfg} = setup_repo("discard")
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
+
+      File.write!(Path.join(tmp_dir, "tracked.txt"), "v1\n")
+      {:ok, :done} = Git.add(files: ["tracked.txt"], config: cfg)
+      {:ok, _} = Git.commit("add tracked", config: cfg)
+
+      File.write!(Path.join(tmp_dir, "tracked.txt"), "v2\n")
+      File.write!(Path.join(tmp_dir, "untracked.txt"), "u\n")
+
+      assert {:ok, :discarded} = Git.Workflow.discard_all(config: cfg)
+
+      assert File.read!(Path.join(tmp_dir, "tracked.txt")) == "v1\n"
+      refute File.exists?(Path.join(tmp_dir, "untracked.txt"))
+    end
+
+    test "dry_run reports what would be removed without changing anything" do
+      {tmp_dir, cfg} = setup_repo("discard_dry")
+      on_exit(fn -> Git.TestHelpers.rm_rf(tmp_dir) end)
+
+      File.write!(Path.join(tmp_dir, "keep.txt"), "u\n")
+
+      assert {:ok, {:dry_run, paths}} = Git.Workflow.discard_all(dry_run: true, config: cfg)
+      assert Enum.any?(paths, &(&1 =~ "keep.txt"))
+      assert File.exists?(Path.join(tmp_dir, "keep.txt"))
+    end
+  end
 end
