@@ -17,6 +17,8 @@ defmodule Git.Commands.Tag do
           message: String.t() | nil,
           file: String.t() | nil,
           force: boolean(),
+          sign: boolean(),
+          local_user: String.t() | nil,
           ref: String.t() | nil,
           sort: String.t() | nil,
           contains: String.t() | nil,
@@ -30,6 +32,8 @@ defmodule Git.Commands.Tag do
             message: nil,
             file: nil,
             force: false,
+            sign: false,
+            local_user: nil,
             ref: nil,
             sort: nil,
             contains: nil,
@@ -48,6 +52,11 @@ defmodule Git.Commands.Tag do
   - If `:create` is set with `:file`, builds `git tag -a <name> -F <path>` (annotated
     message read from a file). `:file` takes precedence over `:message`.
   - If `:create` is set without `:message` or `:file`, builds `git tag <name>` (lightweight).
+  - If `:local_user` is set on annotated creation, replaces `-a` with
+    `-u <keyid>` (a signed tag with that key). Otherwise if `:sign` is `true`,
+    replaces `-a` with `-s` (a signed tag with the default key). Signing only
+    applies to annotated creation, so a message (`:message` or `:file`) is
+    always present and git never opens an editor.
   - If `:force` is set on creation, adds `-f` so an existing tag is moved/replaced.
   - If `:delete` is set, builds `git tag -d <name>`.
   - Otherwise, lists tags with detailed format. Listing accepts `:contains`,
@@ -65,6 +74,12 @@ defmodule Git.Commands.Tag do
 
       iex> Git.Commands.Tag.args(%Git.Commands.Tag{create: "v1.0.0", message: "release 1.0"})
       ["tag", "-a", "v1.0.0", "-m", "release 1.0"]
+
+      iex> Git.Commands.Tag.args(%Git.Commands.Tag{create: "v1.0.0", message: "release 1.0", sign: true})
+      ["tag", "-s", "v1.0.0", "-m", "release 1.0"]
+
+      iex> Git.Commands.Tag.args(%Git.Commands.Tag{create: "v1.0.0", message: "release 1.0", local_user: "ABCD1234"})
+      ["tag", "-u", "ABCD1234", "v1.0.0", "-m", "release 1.0"]
 
       iex> Git.Commands.Tag.args(%Git.Commands.Tag{create: "v1.0.0", force: true})
       ["tag", "-f", "v1.0.0"]
@@ -104,17 +119,24 @@ defmodule Git.Commands.Tag do
   end
 
   # Builds the create-specific args. `:file` takes precedence over `:message`.
-  defp add_create(args, name, %__MODULE__{file: file}) when is_binary(file) do
-    args ++ ["-a", name, "-F", file]
+  defp add_create(args, name, %__MODULE__{file: file} = tag) when is_binary(file) do
+    args ++ annotate_flag(tag) ++ [name, "-F", file]
   end
 
-  defp add_create(args, name, %__MODULE__{message: message}) when is_binary(message) do
-    args ++ ["-a", name, "-m", message]
+  defp add_create(args, name, %__MODULE__{message: message} = tag) when is_binary(message) do
+    args ++ annotate_flag(tag) ++ [name, "-m", message]
   end
 
   defp add_create(args, name, %__MODULE__{}) do
     args ++ [name]
   end
+
+  # Chooses the annotation flag for a signed vs unsigned annotated tag.
+  # `:local_user` (a specific key) takes precedence over `:sign` (the default
+  # key), which takes precedence over a plain annotation.
+  defp annotate_flag(%__MODULE__{local_user: keyid}) when is_binary(keyid), do: ["-u", keyid]
+  defp annotate_flag(%__MODULE__{sign: true}), do: ["-s"]
+  defp annotate_flag(%__MODULE__{}), do: ["-a"]
 
   defp maybe_add(args, _flag, false), do: args
   defp maybe_add(args, flag, true), do: args ++ [flag]

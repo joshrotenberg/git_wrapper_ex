@@ -163,6 +163,8 @@ defmodule Git do
     * `:no_verify` - skip the pre-commit and commit-msg hooks (default `false`)
     * `:no_edit` - reuse the existing message without opening an editor (default `false`)
     * `:signoff` - add a `Signed-off-by` trailer (`-s`, default `false`)
+    * `:sign` - GPG-sign the commit; `true` uses the configured signing key
+      (`-S`) or a keyid string signs with that key (`-S<keyid>`, default `false`)
     * `:author` - override the author, `"Name <email>"` (default `nil`)
     * `:date` - override the author date (default `nil`)
     * `:fixup` - create a `fixup!` commit for the given commit (default `nil`)
@@ -177,6 +179,7 @@ defmodule Git do
       Git.commit("feat: add thing")
       Git.commit(nil, amend: true, no_edit: true)
       Git.commit("chore: sign", signoff: true)
+      Git.commit("feat: signed", sign: true)
 
   """
   @spec commit(String.t() | nil, keyword()) ::
@@ -349,6 +352,10 @@ defmodule Git do
     * `:message` - annotation message (creates an annotated tag when set with `:create`)
     * `:file` - read the annotation message from this file (`-F <path>`, annotated);
       takes precedence over `:message` and never opens an editor
+    * `:sign` - GPG-sign the annotated tag with the default key (`-s`); requires
+      `:message` or `:file` so no editor opens (default `false`)
+    * `:local_user` - GPG-sign the annotated tag with the given key (`-u <keyid>`);
+      takes precedence over `:sign` and requires `:message` or `:file` (default `nil`)
     * `:force` - replace an existing tag on creation (`-f`, moves the tag)
     * `:delete` - name of a tag to delete
     * `:ref` - commit ref to tag (default: HEAD)
@@ -427,6 +434,10 @@ defmodule Git do
     * `:no_commit` - merge but do not create the merge commit (default `false`)
     * `:no_edit` - accept the auto-generated merge message (default `false`)
     * `:allow_unrelated_histories` - merge histories with no common ancestor (default `false`)
+    * `:verify_signatures` - refuse to merge unless the tip commit is signed and
+      valid (`--verify-signatures`, default `false`)
+    * `:gpg_sign` - GPG-sign the merge commit; `true` uses the configured signing
+      key (`-S`) or a keyid string signs with that key (`-S<keyid>`, default `false`)
     * `:message` - merge commit message (`-m`, default `nil`)
     * `:strategy` - merge strategy (`-s`, default `nil`)
     * `:strategy_option` - list of strategy options (`-X`, repeatable, default `[]`)

@@ -116,6 +116,20 @@ defmodule Git.MergeTest do
     test "builds --quit" do
       assert Merge.args(%Merge{quit: true}) == ["merge", "--quit"]
     end
+
+    test "emits -S when gpg_sign is true" do
+      assert Merge.args(%Merge{branch: "feature", gpg_sign: true}) == ["merge", "-S", "feature"]
+    end
+
+    test "emits -S<keyid> when gpg_sign is a keyid string" do
+      assert Merge.args(%Merge{branch: "feature", gpg_sign: "ABCD1234"}) ==
+               ["merge", "-SABCD1234", "feature"]
+    end
+
+    test "emits --verify-signatures" do
+      assert Merge.args(%Merge{branch: "feature", verify_signatures: true}) ==
+               ["merge", "--verify-signatures", "feature"]
+    end
   end
 
   describe "merge branch (fast-forward)" do

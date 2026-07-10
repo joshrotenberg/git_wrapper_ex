@@ -61,7 +61,8 @@ defmodule Git.MixProject do
           Git.History,
           Git.Info,
           Git.Search,
-          Git.Hooks
+          Git.Hooks,
+          Git.Signing
         ],
         "Data Structures": [
           Git.BisectResult,

@@ -3,7 +3,8 @@ defmodule Git.Commands.Merge do
   Implements the `Git.Command` behaviour for `git merge`.
 
   Merges a branch, with `--no-ff`, `--ff-only`, `--squash`, `--no-commit`,
-  `--no-edit`, `--allow-unrelated-histories`, a message (`-m`), a strategy
+  `--no-edit`, `--allow-unrelated-histories`, `--verify-signatures`, GPG
+  signing of the merge commit (`-S`/`-S<keyid>`), a message (`-m`), a strategy
   (`-s`), and strategy options (`-X`, repeatable). Also drives the in-progress
   merge with `--abort`, `--continue`, and `--quit`.
   """
@@ -20,6 +21,8 @@ defmodule Git.Commands.Merge do
           no_commit: boolean(),
           no_edit: boolean(),
           allow_unrelated_histories: boolean(),
+          verify_signatures: boolean(),
+          gpg_sign: boolean() | String.t(),
           message: String.t() | nil,
           strategy: String.t() | nil,
           strategy_option: [String.t()],
@@ -35,6 +38,8 @@ defmodule Git.Commands.Merge do
             no_commit: false,
             no_edit: false,
             allow_unrelated_histories: false,
+            verify_signatures: false,
+            gpg_sign: false,
             message: nil,
             strategy: nil,
             strategy_option: [],
@@ -69,6 +74,15 @@ defmodule Git.Commands.Merge do
 
       iex> Git.Commands.Merge.args(%Git.Commands.Merge{branch: "f", strategy_option: ["ours", "ignore-all-space"]})
       ["merge", "--strategy-option", "ours", "--strategy-option", "ignore-all-space", "f"]
+
+      iex> Git.Commands.Merge.args(%Git.Commands.Merge{branch: "feature", gpg_sign: true})
+      ["merge", "-S", "feature"]
+
+      iex> Git.Commands.Merge.args(%Git.Commands.Merge{branch: "feature", gpg_sign: "ABCD1234"})
+      ["merge", "-SABCD1234", "feature"]
+
+      iex> Git.Commands.Merge.args(%Git.Commands.Merge{branch: "feature", verify_signatures: true})
+      ["merge", "--verify-signatures", "feature"]
 
   """
   @spec args(t()) :: [String.t()]
@@ -128,10 +142,16 @@ defmodule Git.Commands.Merge do
     |> maybe_add(command.no_commit, "--no-commit")
     |> maybe_add(command.no_edit, "--no-edit")
     |> maybe_add(command.allow_unrelated_histories, "--allow-unrelated-histories")
+    |> maybe_add(command.verify_signatures, "--verify-signatures")
+    |> add_gpg_sign(command.gpg_sign)
     |> maybe_add_value(command.strategy, "--strategy")
     |> add_strategy_options(command.strategy_option)
     |> maybe_add_value(command.message, "-m")
   end
+
+  defp add_gpg_sign(args, false), do: args
+  defp add_gpg_sign(args, true), do: args ++ ["-S"]
+  defp add_gpg_sign(args, keyid) when is_binary(keyid), do: args ++ ["-S" <> keyid]
 
   defp add_strategy_options(args, []), do: args
 
