@@ -69,6 +69,40 @@ defmodule Git.BranchesTest do
     remote_dir
   end
 
+  # Branches off `target`, commits each file in `changes`, then squash-merges
+  # the branch back into `target`. Leaves the checkout on `target`.
+  defp squash_merge_into(tmp_dir, config, target, branch, changes) do
+    Git.Branches.create_and_checkout(branch, config: config)
+
+    Enum.each(changes, fn file ->
+      File.write!(Path.join(tmp_dir, file), "#{file}\n")
+      System.cmd("git", ["add", file], cd: tmp_dir)
+      commit(tmp_dir, "work on #{file}")
+    end)
+
+    Git.checkout(config: config, branch: target)
+    System.cmd("git", ["merge", "--squash", branch], cd: tmp_dir)
+
+    System.cmd(
+      "git",
+      [
+        "-c",
+        "user.name=Test User",
+        "-c",
+        "user.email=test@test.com",
+        "commit",
+        "-m",
+        "squash #{branch}"
+      ],
+      cd: tmp_dir
+    )
+  end
+
+  # Squash-merges a new branch into main (the default target).
+  defp squash_merge(tmp_dir, config, branch, changes) do
+    squash_merge_into(tmp_dir, config, "main", branch, changes)
+  end
+
   describe "create_and_checkout/2" do
     test "creates and switches to a new branch", %{config: config} do
       assert {:ok, checkout} = Git.Branches.create_and_checkout("feat/new", config: config)
@@ -315,6 +349,91 @@ defmodule Git.BranchesTest do
 
       assert {:ok, ["feature"]} = Git.Branches.prune_gone(dry_run: true, config: config)
       assert {:ok, true} = Git.Branches.exists?("feature", config: config)
+    end
+  end
+
+  describe "delete_squashed/1" do
+    test "detects a squash-merged branch (dry_run by default)", %{
+      tmp_dir: tmp_dir,
+      config: config
+    } do
+      squash_merge(tmp_dir, config, "feat-squash", ["one.txt", "two.txt"])
+
+      assert {:ok, squashed} = Git.Branches.delete_squashed(config: config)
+      assert "feat-squash" in squashed
+      # Default dry_run leaves the branch in place.
+      assert {:ok, true} = Git.Branches.exists?("feat-squash", config: config)
+    end
+
+    test "does not flag a normally-merged branch", %{tmp_dir: tmp_dir, config: config} do
+      Git.Branches.create_and_checkout("feat-merge", config: config)
+      File.write!(Path.join(tmp_dir, "merged.txt"), "merged\n")
+      System.cmd("git", ["add", "merged.txt"], cd: tmp_dir)
+      commit(tmp_dir, "normal merge work")
+      Git.checkout(config: config, branch: "main")
+      System.cmd("git", ["merge", "--no-ff", "-m", "merge feat-merge", "feat-merge"], cd: tmp_dir)
+
+      assert {:ok, squashed} = Git.Branches.delete_squashed(config: config)
+      refute "feat-merge" in squashed
+    end
+
+    test "does not flag a truly-unmerged branch", %{tmp_dir: tmp_dir, config: config} do
+      Git.Branches.create_and_checkout("feat-unmerged", config: config)
+      File.write!(Path.join(tmp_dir, "wip.txt"), "wip\n")
+      System.cmd("git", ["add", "wip.txt"], cd: tmp_dir)
+      commit(tmp_dir, "unmerged work")
+      Git.checkout(config: config, branch: "main")
+
+      assert {:ok, squashed} = Git.Branches.delete_squashed(config: config)
+      refute "feat-unmerged" in squashed
+    end
+
+    test "deletes squashed branches when dry_run is false", %{tmp_dir: tmp_dir, config: config} do
+      squash_merge(tmp_dir, config, "feat-gone", ["gone.txt"])
+
+      assert {:ok, deleted} = Git.Branches.delete_squashed(dry_run: false, config: config)
+      assert "feat-gone" in deleted
+      assert {:ok, false} = Git.Branches.exists?("feat-gone", config: config)
+    end
+
+    test "never deletes the current branch", %{tmp_dir: tmp_dir, config: config} do
+      # Squash-merge feat into main, then switch onto feat itself so it is the
+      # current branch. It must never be reported even though it is squashed.
+      squash_merge(tmp_dir, config, "feat-current", ["cur.txt"])
+      Git.checkout(config: config, branch: "feat-current")
+
+      assert {:ok, squashed} = Git.Branches.delete_squashed(config: config)
+      refute "feat-current" in squashed
+    end
+
+    test "respects a custom target", %{tmp_dir: tmp_dir, config: config} do
+      # Squash feat into a release branch, not the current branch (main).
+      Git.branch(config: config, create: "release")
+      Git.checkout(config: config, branch: "release")
+      squash_merge_into(tmp_dir, config, "release", "feat-rel", ["rel.txt"])
+      Git.checkout(config: config, branch: "main")
+
+      # Against main (current, the default) it is not squashed...
+      assert {:ok, default_squashed} = Git.Branches.delete_squashed(config: config)
+      refute "feat-rel" in default_squashed
+
+      # ...but against the release target it is detected.
+      assert {:ok, target_squashed} =
+               Git.Branches.delete_squashed(target: "release", config: config)
+
+      assert "feat-rel" in target_squashed
+    end
+
+    test "respects the exclude list", %{tmp_dir: tmp_dir, config: config} do
+      squash_merge(tmp_dir, config, "feat-keep", ["keep.txt"])
+
+      assert {:ok, squashed} =
+               Git.Branches.delete_squashed(
+                 exclude: ["main", "master", "develop", "feat-keep"],
+                 config: config
+               )
+
+      refute "feat-keep" in squashed
     end
   end
 end
