@@ -130,7 +130,11 @@ defmodule Git.Workflow do
       (default `false`)
     * `:config` - a `Git.Config` struct
 
-  Returns `{:ok, commit_result}` on success.
+  Returns `{:ok, commit_result}` on success. When `:delete` is requested but
+  the source branch cannot be deleted (for example it is still checked out in a
+  worktree), returns `{:error, {:branch_not_deleted, reason}}` rather than
+  reporting success over a branch that still exists. The squash commit itself
+  has already landed at that point.
   """
   @spec squash_merge(String.t(), keyword()) :: {:ok, Git.CommitResult.t()} | {:error, term()}
   def squash_merge(branch, opts \\ []) when is_binary(branch) do
@@ -139,12 +143,21 @@ defmodule Git.Workflow do
     delete? = Keyword.get(rest, :delete, false)
 
     with {:ok, _merge_result} <- Git.merge(branch, Keyword.merge(config_kw, squash: true)),
-         {:ok, commit_result} <- Git.commit(message, config_kw) do
-      if delete? do
-        Git.branch(Keyword.merge(config_kw, delete: branch, force_delete: true))
-      end
-
+         {:ok, commit_result} <- Git.commit(message, config_kw),
+         :ok <- delete_source_branch(branch, delete?, config_kw) do
       {:ok, commit_result}
+    end
+  end
+
+  # Deletes the merged source branch when requested. `git branch -D` fails when
+  # the branch is checked out in a worktree; surface that as an error instead of
+  # discarding it and reporting success over a branch that still exists.
+  defp delete_source_branch(_branch, false, _config_kw), do: :ok
+
+  defp delete_source_branch(branch, true, config_kw) do
+    case Git.branch(Keyword.merge(config_kw, delete: branch, force_delete: true)) do
+      {:ok, _} -> :ok
+      {:error, reason} -> {:error, {:branch_not_deleted, reason}}
     end
   end
 
