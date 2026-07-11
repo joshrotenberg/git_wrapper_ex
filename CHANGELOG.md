@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.7.0](https://github.com/joshrotenberg/git_wrapper_ex/compare/v0.6.1...v0.7.0) (2026-07-11)
+
+
+### Features
+
+* complete the git worktree command surface ([#172](https://github.com/joshrotenberg/git_wrapper_ex/issues/172)) ([c6e172d](https://github.com/joshrotenberg/git_wrapper_ex/commit/c6e172d1247eb63ff2f8b3fe58130810d7edfc07))
+* init initial_branch, branch -f, checkout ignore-other-worktrees, CommitResult full hash ([#174](https://github.com/joshrotenberg/git_wrapper_ex/issues/174)) ([5df3ba2](https://github.com/joshrotenberg/git_wrapper_ex/commit/5df3ba20d43c615fbd9750f57f3ce205a035773f))
+* notes copy/merge and reflog expire ([#173](https://github.com/joshrotenberg/git_wrapper_ex/issues/173)) ([810a3d9](https://github.com/joshrotenberg/git_wrapper_ex/commit/810a3d9815b0106a2e185e454a740f50ebee6ebd))
+
+
+### Bug Fixes
+
+* Workflow.squash_merge(delete: true) surfaces a failed branch deletion ([#175](https://github.com/joshrotenberg/git_wrapper_ex/issues/175)) ([e9c46c8](https://github.com/joshrotenberg/git_wrapper_ex/commit/e9c46c879f714f5d12c8e785ed7963097d3b2794))
+
 ## [0.6.1](https://github.com/joshrotenberg/git_wrapper_ex/compare/v0.6.0...v0.6.1) (2026-07-10)
 
 
