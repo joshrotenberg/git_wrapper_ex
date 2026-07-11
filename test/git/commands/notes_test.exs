@@ -60,8 +60,58 @@ defmodule Git.NotesTest do
       assert Notes.args(%Notes{prune: true}) == ["notes", "prune"]
     end
 
+    test "builds args for copy" do
+      assert Notes.args(%Notes{copy: {"HEAD~1", "HEAD"}}) == ["notes", "copy", "HEAD~1", "HEAD"]
+    end
+
+    test "builds args for copy with force" do
+      assert Notes.args(%Notes{copy: {"a", "b"}, force: true}) ==
+               ["notes", "copy", "-f", "a", "b"]
+    end
+
+    test "builds args for merge with strategy" do
+      assert Notes.args(%Notes{merge: "refs/notes/other", strategy: "union"}) ==
+               ["notes", "merge", "-s", "union", "refs/notes/other"]
+    end
+
+    test "builds args for copy honoring notes_ref" do
+      assert Notes.args(%Notes{copy: {"a", "b"}, notes_ref: "agents/metadata"}) ==
+               ["notes", "--ref=agents/metadata", "copy", "a", "b"]
+    end
+
     test "builds args with notes_ref" do
       assert Notes.args(%Notes{notes_ref: "custom"}) == ["notes", "--ref=custom", "list"]
+    end
+  end
+
+  describe "notes copy and merge (integration)" do
+    test "copies a note from one commit to another" do
+      {_tmp_dir, cfg} = setup_repo()
+      {:ok, _} = Git.commit("second", allow_empty: true, config: cfg)
+
+      {:ok, first} = Git.rev_parse(ref: "HEAD~1", config: cfg)
+      {:ok, second} = Git.rev_parse(ref: "HEAD", config: cfg)
+
+      {:ok, :done} =
+        Git.notes(add: true, message: ~s({"phase":"prep"}), ref: first, config: cfg)
+
+      # Squash-like: the note does not exist on the new SHA until copied.
+      assert {:error, _} = Git.notes(show: second, config: cfg)
+
+      {:ok, :done} = Git.notes(copy: {first, second}, config: cfg)
+      assert {:ok, ~s({"phase":"prep"})} = Git.notes(show: second, config: cfg)
+    end
+
+    test "merges a separate notes ref into another" do
+      {_tmp_dir, cfg} = setup_repo()
+
+      {:ok, :done} =
+        Git.notes(add: true, message: "from-a", ref: "HEAD", notes_ref: "agents/a", config: cfg)
+
+      {:ok, :done} =
+        Git.notes(merge: "refs/notes/agents/a", notes_ref: "agents/merged", config: cfg)
+
+      assert {:ok, "from-a"} = Git.notes(show: "HEAD", notes_ref: "agents/merged", config: cfg)
     end
   end
 

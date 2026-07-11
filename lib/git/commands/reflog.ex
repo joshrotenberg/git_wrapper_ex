@@ -14,24 +14,36 @@ defmodule Git.Commands.Reflog do
   @record_sep "\x1e"
   @unit_sep "\x1f"
 
+  # Process dictionary key used to communicate the operation mode from args/1
+  # to parse_output/2. Both are called from the same process inside
+  # Git.Command.run/3, so this is safe even with async tests.
+  @mode_key :__git_reflog_mode__
+
   @type t :: %__MODULE__{
           ref: String.t() | nil,
           max_count: non_neg_integer() | nil,
           all: boolean(),
-          date: String.t() | nil
+          date: String.t() | nil,
+          expire: boolean(),
+          expire_time: String.t() | nil,
+          dry_run: boolean()
         }
 
   defstruct ref: nil,
             max_count: nil,
             all: false,
-            date: nil
+            date: nil,
+            expire: false,
+            expire_time: nil,
+            dry_run: false
 
   @doc """
   Returns the argument list for `git reflog`.
 
-  Uses `--format` with ASCII control characters for reliable structured
-  parsing. The format string produces records separated by RS (\\x1e)
-  with fields separated by US (\\x1f).
+  Show mode uses `--format` with ASCII control characters for reliable
+  structured parsing. The format string produces records separated by RS
+  (\\x1e) with fields separated by US (\\x1f). Expire mode (`:expire`) runs
+  `git reflog expire` instead and returns `{:ok, :done}`.
 
   ## Examples
 
@@ -43,10 +55,28 @@ defmodule Git.Commands.Reflog do
       iex> Enum.member?(args, "-n5")
       true
 
+      iex> Git.Commands.Reflog.args(%Git.Commands.Reflog{expire: true, expire_time: "now", all: true})
+      ["reflog", "expire", "--expire=now", "--all"]
+
+      iex> Git.Commands.Reflog.args(%Git.Commands.Reflog{expire: true, expire_time: "30.days", ref: "refs/notes/agents"})
+      ["reflog", "expire", "--expire=30.days", "refs/notes/agents"]
+
   """
   @spec args(t()) :: [String.t()]
   @impl true
+  def args(%__MODULE__{expire: true} = command) do
+    Process.put(@mode_key, :mutation)
+
+    ["reflog", "expire"]
+    |> maybe_add_option("--expire", command.expire_time)
+    |> maybe_add_flag(command.all, "--all")
+    |> maybe_add_flag(command.dry_run, "--dry-run")
+    |> maybe_add_ref(command.ref)
+  end
+
   def args(%__MODULE__{} = command) do
+    Process.put(@mode_key, :list)
+
     format_str = "#{@record_sep}%H#{@unit_sep}%h#{@unit_sep}%gD#{@unit_sep}%gs"
 
     base = ["reflog", "--format=#{format_str}"]
@@ -61,22 +91,28 @@ defmodule Git.Commands.Reflog do
   @doc """
   Parses the output of `git reflog`.
 
-  Returns `{:ok, [%Git.ReflogEntry{}]}` on success or
-  `{:error, {stdout, exit_code}}` on failure.
+  For show mode, returns `{:ok, [%Git.ReflogEntry{}]}`. For expire mode,
+  returns `{:ok, :done}`. On failure, returns `{:error, {stdout, exit_code}}`.
   """
   @spec parse_output(String.t(), non_neg_integer()) ::
-          {:ok, [ReflogEntry.t()]} | {:error, {String.t(), non_neg_integer()}}
+          {:ok, [ReflogEntry.t()]} | {:ok, :done} | {:error, {String.t(), non_neg_integer()}}
   @impl true
   def parse_output(stdout, 0) do
-    if String.trim(stdout) == "" do
-      {:ok, []}
-    else
-      entries =
-        stdout
-        |> String.split(@record_sep, trim: true)
-        |> Enum.map(&parse_record/1)
+    case Process.get(@mode_key, :list) do
+      :mutation ->
+        {:ok, :done}
 
-      {:ok, entries}
+      :list ->
+        if String.trim(stdout) == "" do
+          {:ok, []}
+        else
+          entries =
+            stdout
+            |> String.split(@record_sep, trim: true)
+            |> Enum.map(&parse_record/1)
+
+          {:ok, entries}
+        end
     end
   end
 

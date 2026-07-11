@@ -72,6 +72,54 @@ defmodule Git.ReflogTest do
       args = Reflog.args(%Reflog{date: "relative"})
       assert "--date=relative" in args
     end
+
+    test "expire builds the expire subcommand" do
+      assert Reflog.args(%Reflog{expire: true, expire_time: "now", all: true}) ==
+               ["reflog", "expire", "--expire=now", "--all"]
+    end
+
+    test "expire with a ref and dry_run" do
+      assert Reflog.args(%Reflog{
+               expire: true,
+               expire_time: "30.days",
+               dry_run: true,
+               ref: "HEAD"
+             }) ==
+               ["reflog", "expire", "--expire=30.days", "--dry-run", "HEAD"]
+    end
+  end
+
+  describe "reflog expire (integration)" do
+    test "expiring all reflogs empties the log", %{tmp_dir: tmp_dir, config: config} do
+      # a couple more entries so there is something to expire
+      System.cmd("git", ["commit", "--allow-empty", "-m", "second"], cd: tmp_dir)
+      System.cmd("git", ["commit", "--allow-empty", "-m", "third"], cd: tmp_dir)
+
+      {:ok, before} = Git.reflog(config: config)
+      assert before != []
+
+      assert {:ok, :done} =
+               Git.reflog(expire: true, expire_time: "now", all: true, config: config)
+
+      {:ok, after_expire} = Git.reflog(config: config)
+      assert after_expire == []
+    end
+
+    test "dry_run reports without modifying the reflog", %{config: config} do
+      {:ok, before} = Git.reflog(config: config)
+
+      assert {:ok, :done} =
+               Git.reflog(
+                 expire: true,
+                 expire_time: "now",
+                 all: true,
+                 dry_run: true,
+                 config: config
+               )
+
+      {:ok, after_dry} = Git.reflog(config: config)
+      assert length(after_dry) == length(before)
+    end
   end
 
   describe "reflog entries" do
