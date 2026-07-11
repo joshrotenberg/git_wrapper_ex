@@ -58,6 +58,9 @@ defmodule Git.CommitTest do
 
       assert result.branch == "main"
       assert String.length(result.hash) > 0
+      # full_hash is the resolved 40-char SHA and starts with the abbreviated hash
+      assert String.length(result.full_hash) == 40
+      assert String.starts_with?(result.full_hash, result.hash)
       assert result.subject == "add hello file"
       assert result.files_changed == 1
       assert result.insertions == 1

@@ -4,11 +4,17 @@ defmodule Git.CommitResult do
 
   Contains the branch name, short commit hash, commit subject, and change
   statistics (files changed, insertions, deletions).
+
+  `hash` is the abbreviated hash git prints; `full_hash` is the full 40-char
+  SHA, resolved by `Git.commit/2` so callers get a stable identifier without a
+  follow-up `rev-parse`. `full_hash` is the empty string only if that
+  resolution could not run (for example a bare `Git.CommitResult.parse/1`).
   """
 
   @type t :: %__MODULE__{
           branch: String.t(),
           hash: String.t(),
+          full_hash: String.t(),
           subject: String.t(),
           files_changed: non_neg_integer(),
           insertions: non_neg_integer(),
@@ -17,6 +23,7 @@ defmodule Git.CommitResult do
 
   defstruct branch: "",
             hash: "",
+            full_hash: "",
             subject: "",
             files_changed: 0,
             insertions: 0,

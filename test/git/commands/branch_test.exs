@@ -48,6 +48,15 @@ defmodule Git.Commands.BranchTest do
                ["branch", "feat/new", "HEAD~1"]
     end
 
+    test "force-move a branch with -f" do
+      assert Branch.args(%Branch{create: "phase", start_point: "abc123", force: true}) ==
+               ["branch", "-f", "phase", "abc123"]
+    end
+
+    test "force without a start point" do
+      assert Branch.args(%Branch{create: "phase", force: true}) == ["branch", "-f", "phase"]
+    end
+
     test "delete branch" do
       assert Branch.args(%Branch{delete: "old"}) == ["branch", "-d", "old"]
     end
@@ -119,6 +128,32 @@ defmodule Git.Commands.BranchTest do
 
       assert branch_hash == older_hash
       refute branch_hash == head_hash
+    end
+
+    test "force moves an existing branch to a new commit", %{tmp_dir: tmp_dir, config: config} do
+      System.cmd("git", ["commit", "--allow-empty", "-m", "second"], cd: tmp_dir)
+
+      # point "phase" at the older commit, then force-move it to HEAD
+      assert {:ok, :done} = Git.branch(create: "phase", start_point: "HEAD~1", config: config)
+
+      assert {:ok, :done} =
+               Git.branch(create: "phase", start_point: "HEAD", force: true, config: config)
+
+      {phase_hash, 0} = System.cmd("git", ["rev-parse", "phase"], cd: tmp_dir)
+      {head_hash, 0} = System.cmd("git", ["rev-parse", "HEAD"], cd: tmp_dir)
+      assert String.trim(phase_hash) == String.trim(head_hash)
+    end
+
+    test "force refuses to move the currently checked-out branch", %{config: config} do
+      # git branch -f will not move the branch HEAD points at; this is the
+      # safety that Git.update_ref does not provide.
+      assert {:error, {output, code}} =
+               Git.branch(create: "main", start_point: "HEAD~0", force: true, config: config)
+
+      assert code != 0
+
+      assert output =~ "used by worktree" or output =~ "checked out" or
+               output =~ "cannot force update"
     end
 
     test "list merged branches", %{tmp_dir: tmp_dir, config: config} do
