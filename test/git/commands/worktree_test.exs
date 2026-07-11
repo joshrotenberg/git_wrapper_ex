@@ -61,6 +61,46 @@ defmodule Git.WorktreeTest do
       assert WorktreeCmd.args(cmd) == ["worktree", "add", "-b", "feat", "/tmp/wt"]
     end
 
+    test "add with new branch and explicit start_point" do
+      cmd = %WorktreeCmd{add_path: "/tmp/wt", add_new_branch: "feat", start_point: "main"}
+      assert WorktreeCmd.args(cmd) == ["worktree", "add", "-b", "feat", "/tmp/wt", "main"]
+    end
+
+    test "start_point takes precedence over add_branch as the positional commit-ish" do
+      cmd = %WorktreeCmd{
+        add_path: "/tmp/wt",
+        add_new_branch: "feat",
+        start_point: "v1.0",
+        add_branch: "main"
+      }
+
+      assert WorktreeCmd.args(cmd) == ["worktree", "add", "-b", "feat", "/tmp/wt", "v1.0"]
+    end
+
+    test "move mode produces correct args" do
+      cmd = %WorktreeCmd{move: {"/tmp/wt", "/tmp/moved"}}
+      assert WorktreeCmd.args(cmd) == ["worktree", "move", "/tmp/wt", "/tmp/moved"]
+    end
+
+    test "move mode honors force" do
+      cmd = %WorktreeCmd{move: {"/tmp/wt", "/tmp/moved"}, force: true}
+      assert WorktreeCmd.args(cmd) == ["worktree", "move", "--force", "/tmp/wt", "/tmp/moved"]
+    end
+
+    test "unlock mode produces correct args" do
+      cmd = %WorktreeCmd{unlock: "/tmp/wt"}
+      assert WorktreeCmd.args(cmd) == ["worktree", "unlock", "/tmp/wt"]
+    end
+
+    test "repair mode produces correct args" do
+      assert WorktreeCmd.args(%WorktreeCmd{repair: true}) == ["worktree", "repair"]
+    end
+
+    test "prune with expire produces --expire" do
+      cmd = %WorktreeCmd{prune: true, expire: "now"}
+      assert WorktreeCmd.args(cmd) == ["worktree", "prune", "--expire", "now"]
+    end
+
     test "add with detach flag" do
       cmd = %WorktreeCmd{add_path: "/tmp/wt", detach: true}
       assert WorktreeCmd.args(cmd) == ["worktree", "add", "--detach", "/tmp/wt"]
@@ -164,8 +204,124 @@ defmodule Git.WorktreeTest do
       assert wt.detached == true
     end
 
+    test "parses a locked worktree with a reason" do
+      output = "worktree /tmp/wt\nHEAD abc1234\nbranch refs/heads/wt\nlocked busy testing\n\n"
+      [wt] = Worktree.parse(output)
+      assert wt.locked == "busy testing"
+    end
+
+    test "parses a locked worktree with no reason" do
+      output = "worktree /tmp/wt\nHEAD abc1234\nlocked\n\n"
+      [wt] = Worktree.parse(output)
+      assert wt.locked == ""
+    end
+
+    test "parses a prunable worktree" do
+      output =
+        "worktree /tmp/gone\nHEAD abc1234\nbranch refs/heads/wt\nprunable gitdir file points to non-existent location\n\n"
+
+      [wt] = Worktree.parse(output)
+      assert wt.prunable == "gitdir file points to non-existent location"
+    end
+
+    test "leaves locked and prunable nil when absent" do
+      output = "worktree /tmp/main\nHEAD abc1234\nbranch refs/heads/main\n\n"
+      [wt] = Worktree.parse(output)
+      assert wt.locked == nil
+      assert wt.prunable == nil
+    end
+
     test "parses empty output" do
       assert Worktree.parse("") == []
+    end
+  end
+
+  describe "move, unlock, repair, prunable (integration)" do
+    test "moves a linked worktree to a new path", %{tmp_dir: tmp_dir, config: config} do
+      from = Path.join(tmp_dir, "wt-from")
+      to = Path.join(tmp_dir, "wt-to")
+
+      assert {:ok, :done} =
+               Git.Command.run(
+                 WorktreeCmd,
+                 %WorktreeCmd{add_path: from, add_new_branch: "mv"},
+                 config
+               )
+
+      assert {:ok, :done} =
+               Git.Command.run(WorktreeCmd, %WorktreeCmd{move: {from, to}}, config)
+
+      refute File.dir?(from)
+      assert File.dir?(to)
+
+      # git reports resolved (symlink-followed) paths, so compare by basename.
+      {:ok, worktrees} = Git.Command.run(WorktreeCmd, %WorktreeCmd{}, config)
+      assert Enum.any?(worktrees, &(Path.basename(&1.path) == "wt-to"))
+      refute Enum.any?(worktrees, &(Path.basename(&1.path) == "wt-from"))
+    end
+
+    test "detects and unlocks a locked worktree", %{tmp_dir: tmp_dir, config: config} do
+      wt = Path.join(tmp_dir, "wt-locked")
+
+      assert {:ok, :done} =
+               Git.Command.run(
+                 WorktreeCmd,
+                 %WorktreeCmd{add_path: wt, add_new_branch: "lk", lock: true},
+                 config
+               )
+
+      {:ok, worktrees} = Git.Command.run(WorktreeCmd, %WorktreeCmd{}, config)
+      locked = Enum.find(worktrees, &(Path.basename(&1.path) == "wt-locked"))
+      assert locked.locked != nil
+
+      assert {:ok, :done} =
+               Git.Command.run(WorktreeCmd, %WorktreeCmd{unlock: wt}, config)
+
+      {:ok, worktrees} = Git.Command.run(WorktreeCmd, %WorktreeCmd{}, config)
+      unlocked = Enum.find(worktrees, &(Path.basename(&1.path) == "wt-locked"))
+      assert unlocked.locked == nil
+    end
+
+    test "start_point pins the new branch at a given commit-ish", %{
+      tmp_dir: tmp_dir,
+      config: config
+    } do
+      wt = Path.join(tmp_dir, "wt-sp")
+
+      assert {:ok, :done} =
+               Git.Command.run(
+                 WorktreeCmd,
+                 %WorktreeCmd{add_path: wt, add_new_branch: "sp", start_point: "main"},
+                 config
+               )
+
+      {main_head, 0} = System.cmd("git", ["rev-parse", "main"], cd: tmp_dir)
+      {sp_head, 0} = System.cmd("git", ["rev-parse", "sp"], cd: tmp_dir)
+      assert String.trim(main_head) == String.trim(sp_head)
+    end
+
+    test "surfaces a prunable orphan, then prune clears it", %{tmp_dir: tmp_dir, config: config} do
+      wt = Path.join(tmp_dir, "wt-orphan")
+
+      assert {:ok, :done} =
+               Git.Command.run(
+                 WorktreeCmd,
+                 %WorktreeCmd{add_path: wt, add_new_branch: "orphan"},
+                 config
+               )
+
+      # Simulate a crashed agent: the directory vanishes without git cleanup.
+      File.rm_rf!(wt)
+
+      {:ok, worktrees} = Git.Command.run(WorktreeCmd, %WorktreeCmd{}, config)
+      orphan = Enum.find(worktrees, &(Path.basename(&1.path) == "wt-orphan"))
+      assert orphan.prunable != nil
+
+      assert {:ok, :done} =
+               Git.Command.run(WorktreeCmd, %WorktreeCmd{prune: true}, config)
+
+      {:ok, worktrees} = Git.Command.run(WorktreeCmd, %WorktreeCmd{}, config)
+      refute Enum.any?(worktrees, &(Path.basename(&1.path) == "wt-orphan"))
     end
   end
 end
