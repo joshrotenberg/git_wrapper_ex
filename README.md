@@ -513,6 +513,19 @@ automatically, or you can request it per call with `:sign` / `:gpg_sign` /
 {:ok, :done} = Git.tag(create: "v1.0.0", message: "release", sign: true, config: config)
 ```
 
+## Examples
+
+Runnable scripts live under [`examples/`](examples/):
+
+- [`examples/state_machine.exs`](examples/state_machine.exs) drives git as a
+  state machine for agent-driven development: a worktree per issue, a commit
+  per phase, JSON metadata in git notes, and mechanical gates (`mix compile` /
+  `mix test` exit codes) deciding whether the machine advances or freezes.
+
+```sh
+mix run --no-start examples/state_machine.exs
+```
+
 ## License
 
 MIT
